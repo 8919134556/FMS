@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Location Data Report · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}
+  {# Same stylesheets as the other reports; Leaflet for the optional path map. #}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <link rel="stylesheet" href="{% static 'css/live_tracking.css' %}">
+  <link rel="stylesheet" href="{% static 'css/trip_report.css' %}">
+{% endblock %}
+{% block content %}
+  {# No location data is rendered server-side — the JS pages it from the RBAC'd API after "Apply Filter". #}
+  <div id="locationReportRoot"
+       data-report-url="{% url 'location-report-data' %}"
+       data-export-url="{% url 'location-report-export' %}"
+       data-route-url="{% url 'trip-report-route' %}"
+       data-max-custom-days="{{ max_custom_range_days }}"
+       data-timezone="{{ display_timezone }}">
+
+    <div class="breadcrumb-fms"><span>Reports</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Location Data Report</span></div>
+
+    <div class="live-header">
+      <div class="live-header-title">
+        <span class="live-header-icon"><i class="bi bi-map"></i></span>
+        <div>
+          <h1 class="page-title mb-0">Location Data Report</h1>
+          <p class="page-subtitle mb-0">Every GPS record of a vehicle for a period, with analysis and data-quality checks.</p>
+        </div>
+      </div>
+    </div>
+
+    {# Filters: vehicle first, then the period; nothing loads until "Apply Filter". #}
+    <div class="card-fms loc-filter-card">
+      <div class="loc-filter-row">
+        <label class="loc-filter-label" for="locVehicle">Vehicle</label>
+        <select id="locVehicle" class="form-select form-select-sm loc-vehicle-select">
+          <option value="">Select a vehicle…</option>
+          <option value="all">All vehicles</option>
+          {% for vehicle in vehicles %}
+            <option value="{{ vehicle.uuid }}">{{ vehicle.registration_number }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="btn btn-sm btn-primary loc-apply-btn" id="locApplyBtn">
+          <i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply Filter
+        </button>
+        <span class="text-small text-muted-fms d-none" id="locPendingHint">
+          <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Filters changed — click Apply Filter to update.
+        </span>
+      </div>
+      <div class="loc-filter-row">
+        <span class="loc-filter-label">Date</span>
+        <div class="loc-range-wrap">
+          {% include "tracking/_report_range_bar.html" with prefix="loc" custom_apply="no" pdf_hint="Header, analysis & every location record" xlsx_hint="Summary, all location records & data-quality sheets" %}
+        </div>
+      </div>
+    </div>
+
+    <div class="trip-refresh-error d-none" id="locError" role="alert">
+      <i class="bi bi-exclamation-triangle me-1"></i><span id="locErrorText"></span>
+    </div>
+
+    <div id="locIntro">
+      {% include "components/empty_state.html" with icon="map" title="Choose a vehicle and a period" message="Select a vehicle (or All vehicles), pick a date range and click Apply Filter to load its complete location history." %}
+    </div>
+
+    <div class="d-none" id="locResults">
+      <p class="text-small text-muted-fms loc-selection-line" id="locSelectionLine"></p>
+
+      {# ---------------- Analysis ---------------- #}
+      <div class="card-fms mb-3">
+        <div class="loc-section-head">
+          <span class="section-title" style="font-size:.95rem;">Analysis</span>
+          <span class="text-small text-muted-fms" id="locAnalysisNote"></span>
+        </div>
+        <div id="locAnalysis"></div>
+      </div>
+
+      <div class="card-fms mb-3">
+        <div class="loc-section-head">
+          <span class="section-title" style="font-size:.95rem;">Data Quality</span>
+          <span class="text-small text-muted-fms">Problem records are flagged, never removed.</span>
+        </div>
+        <div id="locQuality"></div>
+      </div>
+
+      {# ---------------- Map (single vehicle) ---------------- #}
+      <div class="card-fms mb-3" id="locMapCard">
+        <div class="loc-section-head">
+          <span class="section-title" style="font-size:.95rem;">Route Map</span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="locMapToggle" aria-expanded="true">
+            <i class="bi bi-eye-slash me-1" aria-hidden="true"></i><span>Hide map</span>
+          </button>
+        </div>
+        <div id="locMapBody">
+          <div id="locMap" class="loc-map"></div>
+          <p class="text-small text-muted-fms mb-0 mt-2" id="locMapNote"></p>
+        </div>
+      </div>
+
+      {# ---------------- Records ---------------- #}
+      <div class="table-card">
+        <div class="table-card-header loc-records-head">
+          <div class="table-card-title">
+            <span class="section-title">Location Records</span>
+            <span class="text-small text-muted-fms ms-2" id="locRecordCount"></span>
+          </div>
+          <div class="loc-records-controls">
+            <div class="live-status-pills" id="locQualityPills" role="tablist" aria-label="Filter by data status"></div>
+            <label class="loc-page-size" for="locPageSize">
+              <span class="text-small text-muted-fms">Rows</span>
+              <select id="locPageSize" class="form-select form-select-sm">
+                {% for size in page_sizes %}<option value="{{ size }}">{{ size }}</option>{% endfor %}
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="table-responsive-fms">
+          <table class="table loc-table" id="locationTable">
+            <thead><tr id="locHeadRow"></tr></thead>
+            <tbody id="locTableBody"></tbody>
+          </table>
+        </div>
+        <div class="d-none" id="locTableEmpty">
+          {% include "components/empty_state.html" with icon="geo-alt" title="No records" message="No GPS records match this selection." %}
+        </div>
+        <nav class="loc-pagination" id="locPagination" aria-label="Location records pages"></nav>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'js/fms_format.js' %}"></script>
+  <script src="{% static 'js/fms_map.js' %}"></script>
+  <script src="{% static 'js/report_common.js' %}"></script>
+  <script src="{% static 'js/location_report.js' %}"></script>
+{% endblock %}

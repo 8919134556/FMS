@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}GPS Devices · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "tracking_device" "create" as can_create %}
+  {% has_module_perm request.user "tracking_device" "update" as can_update %}
+  {% has_module_perm request.user "tracking_device" "archive" as can_disable %}
+
+  <div class="breadcrumb-fms"><span>Fleet</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>GPS Devices</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">GPS Devices</h1>
+      <p class="page-subtitle">Manage telematics devices and their vehicle assignments.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Devices" count=page_obj.paginator.count create_url=create_url create_label="Add Device" can_create=can_create %}
+
+    {% if devices %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Device</th>
+              <th>IMEI</th>
+              <th>Provider</th>
+              <th>Vehicle</th>
+              <th>Status</th>
+              <th>Last Seen</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for device in devices %}
+              <tr>
+                <td><a href="{% url 'tracking:device_detail' uuid=device.uuid %}">{{ device.name|default:device.imei }}</a></td>
+                <td class="cell-secondary">{{ device.imei }}</td>
+                <td class="cell-secondary">{{ device.get_provider_display }}</td>
+                <td class="cell-secondary">{% if device.vehicle %}<a href="{% url 'vehicles:vehicle_detail' uuid=device.vehicle.uuid %}">{{ device.vehicle.registration_number }}</a>{% else %}Unassigned{% endif %}</td>
+                <td>{% include "components/status_badge.html" with status=device.status label=device.get_status_display %}</td>
+                <td class="cell-secondary">{{ device.last_communication|date:"M d, H:i"|default:"Never" }}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'tracking:device_detail' uuid=device.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% if can_update and not device.vehicle %}
+                        <li><a class="dropdown-item" href="{% url 'tracking:device_detail' uuid=device.uuid %}"><i class="bi bi-link-45deg"></i>Assign</a></li>
+                      {% elif can_update %}
+                        <li>
+                          <form method="post" action="{% url 'tracking:device_unassign' uuid=device.uuid %}">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-x-circle"></i>Unassign</button></form>
+                        </li>
+                      {% endif %}
+                      {% if can_disable %}
+                        <li><hr class="dropdown-divider"></li>
+                        {% if device.status == "SUSPENDED" %}
+                          <li><form method="post" action="{% url 'tracking:device_enable' uuid=device.uuid %}">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-check-circle"></i>Enable</button></form></li>
+                        {% else %}
+                          <li><form method="post" action="{% url 'tracking:device_disable' uuid=device.uuid %}" data-confirm="Disable {{ device.imei }}?">{% csrf_token %}<button type="submit" class="dropdown-item text-danger"><i class="bi bi-slash-circle"></i>Disable</button></form></li>
+                        {% endif %}
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if request.GET.q or request.GET.provider or request.GET.status or request.GET.assigned %}
+        {% include "components/empty_state.html" with icon="funnel" title="No devices match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="cpu" title="No devices registered." message="Register your first GPS device to start receiving telemetry." action_url=create_url action_label="Add Device" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

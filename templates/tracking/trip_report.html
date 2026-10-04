@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Trip Report · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}
+  {% comment %}
+    Reuses Live Tracking's header/status-pill/search/refresh-indicator styles — same
+    look, one definition. trip_report.css adds only what's specific to this page.
+  {% endcomment %}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <link rel="stylesheet" href="{% static 'css/live_tracking.css' %}">
+  <link rel="stylesheet" href="{% static 'css/trip_report.css' %}">
+{% endblock %}
+{% block content %}
+  {# No trip data of any kind is rendered server-side — the JS fetches everything from the RBAC'd API. #}
+  <div id="tripReportRoot"
+       data-trip-report-url="{% url 'trip-report-data' %}"
+       data-trip-route-url="{% url 'trip-report-route' %}"
+       data-trip-export-url="{% url 'trip-report-export' %}"
+       data-trip-analysis-url="{% url 'trip-report-trip' %}"
+       data-trip-single-export-url="{% url 'trip-report-trip-export' %}"
+       data-max-custom-days="{{ max_custom_range_days }}"
+       data-timezone="{{ display_timezone }}">
+
+    <div class="breadcrumb-fms"><span>Reports</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Trip Report</span></div>
+
+    {% include "tracking/_report_header.html" with prefix="trip" title="Trip Report" icon="clock-history" %}
+
+    <p class="text-small text-muted-fms trip-report-note">
+      <i class="bi bi-info-circle me-1"></i><span>Trips are detected from each vehicle's history: ignition ON only becomes a trip once the
+      vehicle is confirmed moving (several readings at speed, or it — or its odometer — moving away), starting where it departed; a stop
+      shorter than the vehicle's Trip Closure Time stays part of the same trip. Both are set per vehicle.</span>
+    </p>
+
+    {# Download = the applied range + vehicle/search filters, generated server-side (apps.tracking.trip_analytics). #}
+    {% include "tracking/_report_range_bar.html" with prefix="trip" pdf_hint="Summary, charts, analysis & tables" xlsx_hint="Summary, vehicle, daily & trip analysis sheets" %}
+
+    <div class="dashboard-kpi-grid is-dense mb-3">
+      {% include "components/kpi_card.html" with label="Total Trips" value="—" value_id="tripKpiTotal" icon="signpost-split" tone="primary" %}
+      {% include "components/kpi_card.html" with label="Active Trips" value="—" value_id="tripKpiActive" icon="broadcast" tone="success" %}
+      {% include "components/kpi_card.html" with label="Distance Travelled" value="—" value_id="tripKpiDistance" icon="speedometer2" tone="info" %}
+      {% include "components/kpi_card.html" with label="Avg. Duration" value="—" value_id="tripKpiDuration" icon="stopwatch" tone="warning" %}
+    </div>
+
+    {% include "tracking/_report_filters.html" with prefix="trip" search_placeholder="Search registration, driver…" search_label="Search trips" pills_label="Filter by trip status" error_noun="trip data" %}
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <div class="table-card-title">
+          <span class="section-title">Trips</span>
+          <span class="text-small text-muted-fms ms-2" id="tripTableCount">Loading…</span>
+        </div>
+      </div>
+
+      <div class="table-responsive-fms">
+        <table class="table" id="tripReportTable">
+          <thead>
+            <tr>
+              <th>Map</th>
+              <th>Vehicle / Driver</th>
+              <th>Status</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Duration</th>
+              <th>Start Location</th>
+              <th>End Location</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody id="tripReportTableBody">
+            {% include "components/loading.html" with rows=6 cols=9 %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-none" id="tripReportEmpty">
+        {% include "components/empty_state.html" with icon="signpost-split" title="No trips in this range" message="No ignition activity was recorded for the selected vehicles and dates." %}
+      </div>
+    </div>
+  </div>
+
+  {% comment %}
+    One shared modal for the expanded route view — a real Leaflet map, created fresh each
+    time it opens and torn down on close (see static/js/trip_report.js), so only the single
+    trip the user actually opens ever pays for map tiles. The always-visible thumbnails in
+    the Map column are a lightweight canvas sparkline instead — see trip_report.js/.css.
+  {% endcomment %}
+  <div class="modal fade" id="tripRouteModal" tabindex="-1" aria-hidden="true" aria-labelledby="tripRouteModalTitle">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl trip-modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="trip-modal-heading">
+            <h3 class="section-title mb-0" id="tripRouteModalTitle" style="font-size:1rem;">Trip Route</h3>
+            <span class="text-small text-muted-fms" id="tripRouteModalTripId"></span>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-0">
+          <div class="trip-modal-layout">
+            <div class="trip-modal-mapcol">
+              <div id="tripRouteModalMap" class="trip-route-modal-map"></div>
+              {# Vehicle playback along the recorded route (static/js/route_playback.js). #}
+              <div class="trip-playback" id="tripPlayback" role="group" aria-label="Route playback">
+                <button type="button" class="btn btn-sm btn-primary trip-playback-btn" id="tripPlaybackPlay" aria-label="Play" title="Play" disabled>
+                  <i class="bi bi-play-fill" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary trip-playback-btn" id="tripPlaybackRestart" aria-label="Restart" title="Restart" disabled>
+                  <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                </button>
+                <input type="range" class="form-range trip-playback-scrub" id="tripPlaybackScrub" min="0" max="1000" value="0"
+                       aria-label="Playback position" disabled>
+                <span class="trip-playback-clock" id="tripPlaybackClock" aria-live="off"></span>
+                <select class="form-select form-select-sm trip-playback-speed" id="tripPlaybackSpeed" aria-label="Playback speed" disabled>
+                  <option value="1">1×</option>
+                  <option value="2">2×</option>
+                  <option value="4">4×</option>
+                  <option value="8">8×</option>
+                </select>
+              </div>
+              <p class="trip-playback-note d-none" id="tripPlaybackNote"></p>
+            </div>
+            {# Details + analysis are computed server-side from the trip's full GPS history (TripAnalysisView). #}
+            <aside class="trip-modal-panel" id="tripModalPanel" aria-live="polite">
+              <section class="trip-panel-section">
+                <h4 class="trip-panel-title"><i class="bi bi-card-list" aria-hidden="true"></i>Trip Details</h4>
+                <dl class="trip-detail-list" id="tripModalDetails"></dl>
+              </section>
+              <section class="trip-panel-section">
+                <h4 class="trip-panel-title"><i class="bi bi-graph-up" aria-hidden="true"></i>Trip Analysis</h4>
+                <div id="tripModalAnalysis">
+                  <div class="trip-panel-loading"><div class="map-loading-spinner"></div><span>Analysing GPS history…</span></div>
+                </div>
+              </section>
+            </aside>
+          </div>
+        </div>
+        <div class="modal-footer trip-modal-footer">
+          <span class="text-small text-muted-fms" id="tripRouteModalSubtitle"></span>
+          <div class="trip-modal-actions">
+            <div class="dropdown dropup">
+              <button type="button" class="btn btn-sm btn-primary dropdown-toggle" id="tripModalDownloadBtn"
+                      data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-download me-1" aria-hidden="true"></i>Download Trip Report
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end trip-download-menu" aria-labelledby="tripModalDownloadBtn">
+                <li>
+                  <button type="button" class="dropdown-item" data-trip-download="pdf">
+                    <i class="bi bi-file-earmark-pdf text-danger" aria-hidden="true"></i>
+                    <span><strong>PDF</strong><small>Route map, graphs &amp; full GPS history</small></span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="dropdown-item" data-trip-download="xlsx">
+                    <i class="bi bi-file-earmark-spreadsheet text-success" aria-hidden="true"></i>
+                    <span><strong>Excel</strong><small>Trip summary, analysis &amp; every GPS record</small></span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'js/auto_refresh.js' %}"></script>
+  <script src="{% static 'js/fms_format.js' %}"></script>
+  <script src="{% static 'js/fms_map.js' %}"></script>
+  <script src="{% static 'js/report_common.js' %}"></script>
+  <script src="{% static 'js/route_playback.js' %}"></script>
+  <script src="{% static 'js/trip_report.js' %}"></script>
+{% endblock %}

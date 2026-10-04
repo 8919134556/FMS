@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{% if object %}Edit Trip{% else %}New Trip{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'trips:trip_list' %}">Trips</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.trip_number }}{% else %}New Trip{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" id="tripForm" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="signpost-split" title="Trip Information" %}
+      <div class="row g-3">
+        {% if object %}
+          <div class="col-md-3">
+            <label class="form-label">Trip Number</label>
+            <input type="text" class="form-control" value="{{ object.trip_number }}" disabled>
+          </div>
+        {% endif %}
+        <div class="col-md-3">
+          <label class="form-label required-mark">{{ form.trip_type.label }}</label>
+          {{ form.trip_type }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label required-mark">{{ form.client.label }}</label>
+          {{ form.client }}
+          {% if form.client.errors %}<div class="invalid-feedback d-block">{{ form.client.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label required-mark">{{ form.priority.label }}</label>
+          {{ form.priority }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="geo-alt" title="Route" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.origin_site.label }}</label>
+          {{ form.origin_site }}
+          {% if form.origin_site.errors %}<div class="invalid-feedback d-block">{{ form.origin_site.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.destination_site.label }}</label>
+          {{ form.destination_site }}
+          {% if form.destination_site.errors %}<div class="invalid-feedback d-block">{{ form.destination_site.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.planned_distance.label }} (km)</label>
+          {{ form.planned_distance }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.route.label }}</label>
+          {{ form.route }}
+          <div class="form-text">Optional — a reusable multi-stop itinerary this trip follows.</div>
+        </div>
+      </div>
+      <p class="text-small text-muted-fms mt-2 mb-0" id="siteClientHint">
+        <i class="bi bi-info-circle me-1"></i>Only sites belonging to the selected client can be chosen as origin/destination.
+      </p>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="truck-front" title="Vehicle (optional)" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.vehicle.label }}</label>
+          {{ form.vehicle }}
+          {% if form.vehicle.errors %}<div class="invalid-feedback d-block">{{ form.vehicle.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+      <p class="text-small text-muted-fms mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Formal assignment (with availability/conflict checks) happens via the "Assign" action on the trip's detail page — this is just a preference.
+      </p>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="person-badge" title="Driver (optional)" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.driver.label }}</label>
+          {{ form.driver }}
+          {% if form.driver.errors %}<div class="invalid-feedback d-block">{{ form.driver.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="calendar-event" title="Schedule" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.scheduled_start.label }}</label>
+          {{ form.scheduled_start }}
+          {% if form.scheduled_start.errors %}<div class="invalid-feedback d-block">{{ form.scheduled_start.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.scheduled_end.label }}</label>
+          {{ form.scheduled_end }}
+          {% if form.scheduled_end.errors %}<div class="invalid-feedback d-block">{{ form.scheduled_end.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Estimated Duration</label>
+          <input type="text" class="form-control" id="tripDurationDisplay" value="—" disabled>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="journal-text" title="Instructions" %}
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">{{ form.instructions.label }}</label>
+          {{ form.instructions }}
+          <div class="form-text">Special requirements or stop-by-stop notes for the driver.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.internal_notes.label }}</label>
+          {{ form.internal_notes }}
+          <div class="form-text">Internal only — not shared with the driver or client.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'trips:trip_detail' uuid=object.uuid %}{% else %}{% url 'trips:trip_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      {% if object %}
+        <button type="submit" class="btn btn-primary" data-submit-loading="Saving Changes…">Save Changes</button>
+      {% else %}
+        <button type="submit" name="action" value="draft" class="btn btn-outline-secondary" data-submit-loading="Saving Draft…">Save Draft</button>
+        <button type="submit" name="action" value="schedule" class="btn btn-primary" data-submit-loading="Scheduling Trip…">Schedule Trip</button>
+      {% endif %}
+    </div>
+  </form>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/trip-form.js' %}"></script>
+{% endblock %}

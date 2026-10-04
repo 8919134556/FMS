@@ -1,0 +1,175 @@
+/*
+ * FMS App Shell
+ * Global resets, typography defaults, and the sidebar/topbar/content grid.
+ * Component-level styling (cards, tables, badges, sidebar nav, etc.) lives in
+ * components.css — this file only owns page-level structure.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--fms-font-sans);
+  font-size: var(--fms-text-body-lg);
+  color: var(--fms-text-primary);
+  background: var(--fms-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fms-text-primary);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--fms-primary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--fms-primary-hover);
+}
+
+small, .text-small {
+  font-size: var(--fms-text-small);
+}
+
+code, kbd, pre {
+  font-family: var(--fms-font-mono);
+}
+
+::selection {
+  background: rgba(var(--fms-primary-rgb), 0.35);
+  color: #fff;
+}
+
+/* Scrollbars (WebKit) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fms-border-strong);
+  border-radius: var(--fms-radius-full);
+  border: 2px solid var(--fms-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fms-text-muted);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--fms-border-strong) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--fms-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Applied to <html> for ~260ms by theme.js while switching themes, so the
+   swap reads as a soft cross-fade instead of an instant flip. Scoped to a
+   short-lived class (not a permanent global rule) so ordinary hover/focus
+   interactions stay instant. */
+.theme-transitioning,
+.theme-transitioning * {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, box-shadow 200ms ease !important;
+}
+
+/* ---------------------------------------------------------------------- */
+/* App shell layout                                                       */
+/* ---------------------------------------------------------------------- */
+
+.fms-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.fms-sidebar {
+  width: var(--fms-sidebar-width);
+  flex-shrink: 0;
+  background: var(--fms-sidebar);
+  border-right: 1px solid var(--fms-border);
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: var(--fms-z-sidebar);
+  display: flex;
+  flex-direction: column;
+  transition: width var(--fms-duration-base) var(--fms-ease), transform var(--fms-duration-base) var(--fms-ease);
+}
+
+.fms-shell.is-collapsed .fms-sidebar {
+  width: var(--fms-sidebar-width-collapsed);
+}
+
+.fms-shell.is-collapsed .fms-main {
+  margin-left: var(--fms-sidebar-width-collapsed);
+}
+
+.fms-main {
+  margin-left: var(--fms-sidebar-width);
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  transition: margin-left var(--fms-duration-base) var(--fms-ease);
+}
+
+.fms-content {
+  padding: var(--fms-space-6);
+  flex-grow: 1;
+  max-width: var(--fms-content-max);
+  width: 100%;
+}
+
+@media (max-width: 1199.98px) {
+  .fms-sidebar {
+    transform: translateX(-100%);
+    width: var(--fms-sidebar-width);
+    box-shadow: var(--fms-shadow-lg);
+  }
+  .fms-shell.is-mobile-open .fms-sidebar {
+    transform: translateX(0);
+  }
+  .fms-main,
+  .fms-shell.is-collapsed .fms-main {
+    margin-left: 0;
+  }
+  .fms-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 7, 18, 0.6);
+    z-index: calc(var(--fms-z-sidebar) - 1);
+  }
+  .fms-shell.is-mobile-open .fms-sidebar-backdrop {
+    display: block;
+  }
+}
+
+@media (min-width: 1200px) {
+  .fms-sidebar-backdrop {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .fms-content {
+    padding: var(--fms-space-4);
+  }
+}

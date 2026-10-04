@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Branches / Depots · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "branch" "create" as can_create %}
+
+  <div class="breadcrumb-fms"><span>Clients</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Branches / Depots</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Branches / Depots</h1>
+      <p class="page-subtitle">Manage Zentora's own depots, offices, yards, and workshops.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Branches" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="Add Branch" can_create=can_create %}
+
+    {% if branches %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Branch</th>
+              <th>Type</th>
+              <th>Client</th>
+              <th>City</th>
+              <th>Manager</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for branch in branches %}
+              <tr>
+                <td>
+                  <a href="{% url 'locations:branch_detail' uuid=branch.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                      <i class="bi bi-diagram-3"></i>
+                    </span>
+                    <span>
+                      <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ branch.name }}</div>
+                      <div class="cell-secondary">{{ branch.code }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">{{ branch.get_branch_type_display }}</td>
+                <td class="cell-secondary">{% if branch.client %}<a href="{% url 'clients:client_detail' uuid=branch.client.uuid %}">{{ branch.client.client_name }}</a>{% else %}—{% endif %}</td>
+                <td class="cell-secondary">{{ branch.city|default:"—" }}</td>
+                <td class="cell-secondary">{{ branch.manager.get_full_name|default:"—" }}</td>
+                <td>{% include "components/status_badge.html" with status=branch.status label=branch.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'locations:branch_detail' uuid=branch.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% has_module_perm request.user "branch" "update" as can_update %}
+                      {% if can_update %}
+                        <li><a class="dropdown-item" href="{% url 'locations:branch_edit' uuid=branch.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% has_module_perm request.user "branch" "archive" as can_archive %}
+                      {% if can_archive %}
+                        <li><hr class="dropdown-divider"></li>
+                        {% if branch.status == "ACTIVE" %}
+                          <li>
+                            <form method="post" action="{% url 'locations:branch_deactivate' uuid=branch.uuid %}" data-confirm="Deactivate {{ branch.name }}?">
+                              {% csrf_token %}<button type="submit" class="dropdown-item text-danger"><i class="bi bi-slash-circle"></i>Deactivate</button>
+                            </form>
+                          </li>
+                        {% else %}
+                          <li>
+                            <form method="post" action="{% url 'locations:branch_activate' uuid=branch.uuid %}">
+                              {% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-check-circle"></i>Activate</button>
+                            </form>
+                          </li>
+                        {% endif %}
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.status or current_filters.branch_type or current_filters.client %}
+        {% include "components/empty_state.html" with icon="funnel" title="No branches match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="diagram-3" title="No branches yet" message="Add your first depot, office, yard, or workshop." action_url=create_url action_label="Add Branch" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

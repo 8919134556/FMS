@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ device.imei }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "tracking_device" "update" as can_update %}
+  {% has_module_perm request.user "tracking_device" "archive" as can_disable %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'tracking:device_list' %}">GPS Devices</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ device.imei }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-cpu"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ device.name|default:device.imei }}</h1>
+          {% include "components/status_badge.html" with status=device.status label=device.get_status_display %}
+          {% include "components/status_badge.html" with status=connection_status label=connection_status %}
+        </div>
+        <p class="page-subtitle mb-0">{{ device.imei }} &middot; {{ device.get_provider_display }}{% if device.device_model %} &middot; {{ device.device_model }}{% endif %}</p>
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if can_update %}
+        <a href="{% url 'tracking:device_edit' uuid=device.uuid %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+        <form method="post" action="{% url 'tracking:device_regenerate_key' uuid=device.uuid %}" data-confirm="Regenerate the ingestion key for {{ device.imei }}? The previous key stops working immediately.">
+          {% csrf_token %}<button type="submit" class="btn btn-outline-secondary"><i class="bi bi-key me-1"></i>Regenerate Key</button>
+        </form>
+      {% endif %}
+      {% if can_disable %}
+        {% if device.status == "SUSPENDED" %}
+          <form method="post" action="{% url 'tracking:device_enable' uuid=device.uuid %}">
+            {% csrf_token %}<button type="submit" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Enable</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'tracking:device_disable' uuid=device.uuid %}" data-confirm="Disable {{ device.imei }}? It will be unable to ingest telemetry until re-enabled.">
+            {% csrf_token %}<button type="submit" class="btn btn-outline-danger"><i class="bi bi-slash-circle me-1"></i>Disable</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Device Information</span>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4"><div class="cell-secondary">IMEI</div><div>{{ device.imei }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Serial Number</div><div>{{ device.serial_number|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Provider</div><div>{{ device.get_provider_display }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Manufacturer</div><div>{{ device.manufacturer|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Model</div><div>{{ device.device_model|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Firmware</div><div>{{ device.firmware_version|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">SIM Number</div><div>{{ device.sim_number|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">SIM Provider</div><div>{{ device.sim_provider|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Last Seen</div><div>{{ device.last_communication|date:"M d, H:i:s"|default:"Never" }}</div></div>
+        </div>
+        {% if device.provider == "teltonika" %}
+          <div class="alert alert-secondary d-flex align-items-start gap-2 mt-3 mb-0">
+            <i class="bi bi-info-circle mt-1"></i>
+            <div>
+              <strong>Protocol: Teltonika Codec 8 AVL.</strong> Login is IMEI-only — this protocol has no device secret on the wire.
+              {% if supported_commands %}<br>Supported commands: {{ supported_commands|join:", " }}.{% endif %}
+            </div>
+          </div>
+        {% elif supported_commands %}
+          <p class="text-small text-muted-fms mt-3 mb-0">Supported commands: {{ supported_commands|join:", " }}.</p>
+        {% endif %}
+      </div>
+
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Latest Telemetry</span>
+        {% if current_telemetry %}
+          <div class="row g-3 mt-1">
+            <div class="col-md-3"><div class="cell-secondary">Timestamp</div><div>{{ current_telemetry.timestamp|date:"M d, H:i:s" }}</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Speed</div><div>{{ current_telemetry.speed|default:"—" }} km/h</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Ignition</div><div>{{ current_telemetry.ignition|yesno:"On,Off,Unknown" }}</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Heading</div><div>{{ current_telemetry.heading|default:"—" }}&deg;</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Latitude</div><div>{{ current_telemetry.latitude }}</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Longitude</div><div>{{ current_telemetry.longitude }}</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Odometer</div><div>{{ current_telemetry.odometer|default:"—" }}</div></div>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="geo-alt" title="No recent position available" message="This device hasn't reported a position yet." %}
+        {% endif %}
+      </div>
+
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Recent Ingestion Events</span>
+        {% if recent_raw_events %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table table-sm">
+              <thead><tr><th>Received</th><th>Status</th><th>Error</th></tr></thead>
+              <tbody>
+                {% for ev in recent_raw_events %}
+                  <tr>
+                    <td class="cell-secondary">{{ ev.received_at|date:"M d, H:i:s" }}</td>
+                    <td>{% include "components/status_badge.html" with status=ev.processing_status label=ev.get_processing_status_display %}</td>
+                    <td class="cell-secondary text-small">{{ ev.error_message|default:"—"|truncatechars:80 }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0 mt-2">No ingestion events recorded yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card-fms mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="section-title" style="font-size:.95rem;">Assigned Vehicle</span>
+          {% if can_update and not device.vehicle %}
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assignDeviceModal"><i class="bi bi-link-45deg me-1"></i>Assign</button>
+          {% endif %}
+        </div>
+        {% if device.vehicle %}
+          <div class="d-flex align-items-center justify-content-between p-3" style="border:1px solid var(--fms-border); border-radius:10px;">
+            <div>
+              <a href="{% url 'vehicles:vehicle_detail' uuid=device.vehicle.uuid %}" class="fw-semibold text-decoration-none">{{ device.vehicle.registration_number }}</a>
+              <div class="cell-secondary">{{ device.vehicle.make }} {{ device.vehicle.model }}</div>
+            </div>
+            {% if can_update %}
+              <form method="post" action="{% url 'tracking:device_unassign' uuid=device.uuid %}" data-confirm="Unassign this device from {{ device.vehicle.registration_number }}?">
+                {% csrf_token %}<button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Unassign</button>
+              </form>
+            {% endif %}
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="link-45deg" title="Unassigned" message="Assign this device to a vehicle to start tracking its telemetry." %}
+        {% endif %}
+      </div>
+
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Recent Activity</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp|date:"M d, H:i" }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+
+      <div class="card-fms mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="section-title" style="font-size:.95rem;">Commands</span>
+          {% if can_command %}
+            <a href="{% url 'tracking:command_create' %}?device={{ device.uuid }}" class="btn btn-sm btn-primary"><i class="bi bi-terminal me-1"></i>Send Command</a>
+          {% endif %}
+        </div>
+        {% if recent_commands %}
+          <div class="d-flex flex-column gap-2">
+            {% for command in recent_commands %}
+              <a href="{% url 'tracking:command_detail' uuid=command.uuid %}" class="d-flex justify-content-between align-items-center p-2 text-decoration-none" style="border:1px solid var(--fms-border); border-radius:8px;">
+                <span>{{ command.get_command_type_display }}</span>
+                {% include "components/status_badge.html" with status=command.status label=command.get_status_display %}
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No commands sent yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if can_update and not device.vehicle %}
+    <div class="modal fade" id="assignDeviceModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'tracking:device_assign' uuid=device.uuid %}">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Assign {{ device.imei }} to a Vehicle</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <label class="form-label required-mark">{{ assign_form.vehicle.label }}</label>
+              {{ assign_form.vehicle }}
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Assign</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

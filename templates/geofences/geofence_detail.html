@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ geofence.name }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "geofence" "update" as can_update %}
+  {% has_module_perm request.user "geofence" "archive" as can_archive %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'geofences:geofence_list' %}">Geofences</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ geofence.name }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-pin-map"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ geofence.name }}</h1>
+          {% include "components/status_badge.html" with status=geofence.status label=geofence.get_status_display %}
+        </div>
+        <p class="page-subtitle mb-0">
+          {{ geofence.code }} &middot; {{ geofence.radius_meters }} m radius
+          {% if geofence.site %} &middot; <a href="{% url 'locations:site_detail' uuid=geofence.site.uuid %}">{{ geofence.site.site_name }}</a>{% endif %}
+          {% if geofence.branch %} &middot; <a href="{% url 'locations:branch_detail' uuid=geofence.branch.uuid %}">{{ geofence.branch.name }}</a>{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_update %}
+        <a href="{% url 'geofences:geofence_edit' uuid=geofence.uuid %}" class="btn btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+      {% endif %}
+      {% if can_archive %}
+        {% if geofence.status == "ACTIVE" %}
+          <form method="post" action="{% url 'geofences:geofence_deactivate' uuid=geofence.uuid %}" data-confirm="Deactivate {{ geofence.name }}?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-slash-circle me-1"></i>Deactivate</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'geofences:geofence_activate' uuid=geofence.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Activate</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dashboard-kpi-grid mb-3">
+    {% include "components/kpi_card.html" with label="Total Crossings" value=event_count icon="arrow-left-right" tone="primary" %}
+    {% include "components/kpi_card.html" with label="Radius" value=geofence.radius_meters icon="rulers" tone="info" %}
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Recent Crossings</span>
+        {% if recent_events %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Vehicle</th><th>Event</th><th>Coordinates</th><th>When</th></tr></thead>
+              <tbody>
+                {% for event in recent_events %}
+                  <tr>
+                    <td><a href="{% url 'vehicles:vehicle_detail' uuid=event.vehicle.uuid %}">{{ event.vehicle.registration_number }}</a></td>
+                    <td>
+                      <span class="status-pill tone-{% if event.event_type == 'ENTER' %}success{% else %}neutral{% endif %}">
+                        <span class="dot"></span>{{ event.get_event_type_display }}
+                      </span>
+                    </td>
+                    <td class="cell-secondary">{{ event.latitude }}, {{ event.longitude }}</td>
+                    <td class="cell-secondary">{{ event.occurred_at|date:"M d, Y H:i" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="arrow-left-right" title="No crossings yet" message="Vehicle entries and exits for this geofence will appear here." %}
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Boundary</span>
+        <div class="d-flex justify-content-between mt-2"><span class="cell-secondary">Center</span><span>{{ geofence.center_latitude }}, {{ geofence.center_longitude }}</span></div>
+        <div class="d-flex justify-content-between mt-1"><span class="cell-secondary">Radius</span><span>{{ geofence.radius_meters }} m</span></div>
+      </div>
+      {% if geofence.description %}
+        <div class="card-fms mb-3">
+          <span class="section-title" style="font-size:.95rem;">Description</span>
+          <p class="text-small mb-0 mt-2">{{ geofence.description }}</p>
+        </div>
+      {% endif %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

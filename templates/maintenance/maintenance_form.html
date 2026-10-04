@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Maintenance{% else %}Schedule Maintenance{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'maintenance:maintenance_list' %}">Maintenance</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Schedule{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.maintenance_number }}{% else %}Schedule Maintenance{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="truck-front" title="Vehicle" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.vehicle.label }}</label>
+          {{ form.vehicle }}
+          {% if form.vehicle.errors %}<div class="invalid-feedback d-block">{{ form.vehicle.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.maintenance_type.label }}</label>
+          {{ form.maintenance_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.priority.label }}</label>
+          {{ form.priority }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="calendar-event" title="Schedule" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.scheduled_date.label }}</label>
+          {{ form.scheduled_date }}
+          {% if form.scheduled_date.errors %}<div class="invalid-feedback d-block">{{ form.scheduled_date.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.expected_completion_date.label }}</label>
+          {{ form.expected_completion_date }}
+          {% if form.expected_completion_date.errors %}<div class="invalid-feedback d-block">{{ form.expected_completion_date.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="speedometer2" title="Odometer" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.odometer_at_service.label }}</label>
+          {{ form.odometer_at_service }}
+          {% if form.odometer_at_service.errors %}<div class="invalid-feedback d-block">{{ form.odometer_at_service.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.next_service_odometer.label }}</label>
+          {{ form.next_service_odometer }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.next_service_date.label }}</label>
+          {{ form.next_service_date }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="tools" title="Service" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.service_center.label }}</label>
+          {{ form.service_center }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.technician.label }}</label>
+          {{ form.technician }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description }}
+          <div class="form-text">What work is needed / instructions for the service center.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="box-seam" title="Parts (optional)" %}
+      {{ parts_formset.management_form }}
+      <div class="table-responsive-fms" id="partsFormsetTable">
+        <table class="table">
+          <thead><tr><th>Part Name</th><th>Part Number</th><th>Qty</th><th>Unit Cost</th><th></th></tr></thead>
+          <tbody>
+            {% for part_form in parts_formset %}
+              <tr class="part-form-row">
+                {% for hidden in part_form.hidden_fields %}{{ hidden }}{% endfor %}
+                <td>{{ part_form.part_name }}{% if part_form.part_name.errors %}<div class="invalid-feedback d-block">{{ part_form.part_name.errors|join:", " }}</div>{% endif %}</td>
+                <td>{{ part_form.part_number }}</td>
+                <td>{{ part_form.quantity }}</td>
+                <td>{{ part_form.unit_cost }}</td>
+                <td>{% if part_form.DELETE %}<div class="form-check">{{ part_form.DELETE }}<label class="form-check-label text-small">Remove</label></div>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-small text-muted-fms mb-0"><i class="bi bi-info-circle me-1"></i>Parts are optional line items — actual cost is entered when the job is completed.</p>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="cash-coin" title="Cost" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.estimated_cost.label }}</label>
+          {{ form.estimated_cost }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="journal-text" title="Notes" %}
+      <div class="row g-3">
+        <div class="col-12">
+          {{ form.notes }}
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-secondary d-flex align-items-start gap-2">
+      <i class="bi bi-info-circle mt-1"></i>
+      <div>Document uploads (invoices, inspection reports) move into this job's Documents tab once that module ships.</div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'maintenance:maintenance_detail' uuid=object.uuid %}{% else %}{% url 'maintenance:maintenance_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Scheduling…{% endif %}">
+        {% if object %}Save Changes{% else %}Schedule Maintenance{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

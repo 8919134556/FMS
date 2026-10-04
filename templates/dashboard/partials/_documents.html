@@ -1,0 +1,44 @@
+{% load fms_extras %}
+  {% comment %}============ Section 8: Document Compliance ============{% endcomment %}
+  {% if can_view_document %}
+    <div class="table-card mt-4">
+      <div class="table-card-header">
+        <span class="section-title">Document Compliance</span>
+        <a href="/documents/" class="btn btn-sm btn-outline-secondary">View All Documents</a>
+      </div>
+      {% if document_compliance_error %}
+        <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load document data.</div>
+      {% elif document_compliance.expired or document_compliance.expiring_7_days or document_compliance.expiring_30_days %}
+        <div class="p-3 pt-0">
+          <div class="today-ops-grid mb-3">
+            {% include "components/kpi_card.html" with label="Expired" value=document_compliance.expired icon="exclamation-triangle" tone="danger" href="/documents/?expiry=expired" %}
+            {% include "components/kpi_card.html" with label="Expiring in 7 Days" value=document_compliance.expiring_7_days icon="calendar-event" tone="warning" href="/documents/?expiry=expiring_soon" %}
+            {% include "components/kpi_card.html" with label="Expiring in 30 Days" value=document_compliance.expiring_30_days icon="hourglass-split" tone="info" href="/documents/?expiry=expiring_soon" %}
+          </div>
+        </div>
+        {% if document_compliance.table_rows %}
+          <div class="table-responsive-fms">
+            <table class="table">
+              <thead><tr><th>Document</th><th>Related Entity</th><th>Expiry</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+              <tbody>
+                {% for doc in document_compliance.table_rows %}
+                  <tr>
+                    <td>{{ doc.title }}</td>
+                    <td class="cell-secondary">{{ doc.content_object }}</td>
+                    <td class="cell-secondary">{{ doc.expiry_date }}</td>
+                    <td>
+                      {% if doc.expiry_status == "EXPIRED" %}{% include "components/status_badge.html" with status="EXPIRED" label=doc.expiry_label %}
+                      {% else %}{% include "components/status_badge.html" with status="EXPIRING_SOON" label=doc.expiry_label %}{% endif %}
+                    </td>
+                    <td class="text-end"><a href="{% url 'documents:document_detail' uuid=doc.uuid %}" class="btn btn-sm btn-outline-secondary">View Document</a></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="check-lg" title="No documents are expiring soon" message="All documents are currently valid." %}
+      {% endif %}
+    </div>
+  {% endif %}

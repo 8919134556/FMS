@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ role.name }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "role" "update" as can_update %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'accounts_portal:role_list' %}">Roles</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ role.code }}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h1 class="page-title">{{ role.name }}</h1>
+        {% if role.is_system_role %}<span class="status-pill tone-purple"><span class="dot"></span>System</span>{% endif %}
+        {% if role.is_active %}
+          {% include "components/status_badge.html" with status="ACTIVE" label="Active" %}
+        {% else %}
+          {% include "components/status_badge.html" with status="INACTIVE" label="Inactive" %}
+        {% endif %}
+      </div>
+      <p class="page-subtitle">{{ role.description|default:"No description provided." }}</p>
+    </div>
+    {% if can_update %}
+      <a href="{% url 'accounts_portal:role_edit' uuid=role.uuid %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    {% endif %}
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-3">
+      <div class="card-fms p-4">
+        <div class="section-title mb-3" style="font-size:.95rem;">Overview</div>
+        <dl class="row text-small mb-0" style="row-gap:10px;">
+          <dt class="col-5 text-muted-fms">Code</dt><dd class="col-7 mb-0"><code>{{ role.code }}</code></dd>
+          <dt class="col-5 text-muted-fms">Members</dt><dd class="col-7 mb-0">{{ member_count }}</dd>
+          <dt class="col-5 text-muted-fms">Created</dt><dd class="col-7 mb-0">{{ role.created_at|date:"M d, Y" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="col-lg-9">
+      <div class="card-fms p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="section-title" style="font-size:.95rem;">Permission Matrix</span>
+          {% if not can_update %}<span class="text-small text-muted-fms">Read-only</span>{% endif %}
+        </div>
+        <form method="post" action="{% url 'accounts_portal:role_update_permissions' uuid=role.uuid %}">
+          {% csrf_token %}
+          <div class="d-flex flex-column" style="gap:2px;">
+            {% for module_label, entries in permission_matrix.items %}
+              <div class="d-flex flex-wrap align-items-center py-2" style="border-bottom: 1px solid var(--fms-border); gap: 8px 10px;">
+                <div style="min-width:160px;" class="text-small fw-semibold text-secondary-fms">{{ module_label }}</div>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for entry in entries %}
+                    <input
+                      type="checkbox"
+                      class="btn-check"
+                      name="permissions"
+                      value="{{ entry.permission.id }}"
+                      id="perm-{{ entry.permission.id }}"
+                      autocomplete="off"
+                      {% if entry.assigned %}checked{% endif %}
+                      {% if not can_update %}disabled{% endif %}
+                    >
+                    <label class="btn btn-sm btn-outline-primary" for="perm-{{ entry.permission.id }}">
+                      {{ entry.permission.get_action_display }}
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          {% if can_update %}
+            <div class="d-flex justify-content-end mt-3">
+              <button type="submit" class="btn btn-primary btn-sm">Save Permissions</button>
+            </div>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}

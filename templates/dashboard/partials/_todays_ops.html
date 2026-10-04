@@ -1,0 +1,28 @@
+{% load fms_extras %}
+  {% comment %}============ Section 2: Today's Operations ============{% endcomment %}
+  {% if can_view_trip %}
+    <div class="card-fms mt-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <span class="section-title" style="font-size:.95rem;">{{ date_range_label }}'s Operations</span>
+          <p class="text-small text-muted-fms mb-0">Trips scheduled to start {{ date_range_label|lower }}, by status.</p>
+        </div>
+      </div>
+      {% if trip_status_summary_error %}
+        <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load trip data.
+          <div class="mt-2"><a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Retry</a></div>
+        </div>
+      {% elif trip_status_summary.total %}
+        <div class="today-ops-grid">
+          {% include "components/kpi_card.html" with label="Scheduled" value=trip_status_summary.scheduled icon="calendar-check" tone="purple" href="/trips/?status=SCHEDULED" %}
+          {% include "components/kpi_card.html" with label="Assigned" value=trip_status_summary.assigned icon="person-check" tone="info" href="/trips/?status=ASSIGNED" %}
+          {% include "components/kpi_card.html" with label="In Progress" value=trip_status_summary.in_progress icon="send" tone="info" href="/trips/?status=IN_PROGRESS" %}
+          {% include "components/kpi_card.html" with label="Completed" value=trip_status_summary.completed icon="check-circle" tone="success" href="/trips/?status=COMPLETED" %}
+          {% include "components/kpi_card.html" with label="Delayed" value=trip_status_summary.delayed icon="exclamation-triangle" tone="warning" href=delayed_trips_url %}
+          {% include "components/kpi_card.html" with label="Cancelled" value=trip_status_summary.cancelled icon="x-circle" tone="danger" href="/trips/?status=CANCELLED" %}
+        </div>
+      {% else %}
+        {% include "components/empty_state.html" with icon="calendar-x" title="No trips scheduled" message="No trips are scheduled for this period." %}
+      {% endif %}
+    </div>
+  {% endif %}

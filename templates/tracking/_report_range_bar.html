@@ -1,0 +1,48 @@
+{% comment %}
+  Shared date-range bar for every page under Reports: Today / Yesterday /
+  Last 3 / 5 / 7 Days / Custom (From → To, Apply) + "Download Report → PDF |
+  Excel". Driven by FmsReportKit.createRangeControl + wireDownloadMenu; the
+  export covers the applied range and the page's vehicle/search filters.
+
+  Params: prefix, pdf_hint, xlsx_hint, custom_apply (default shown; "no" hides the custom-range
+  Apply for pages that apply all filters with their own button).
+{% endcomment %}
+<div class="trip-range-bar" id="{{ prefix }}RangeBar">
+  <div class="trip-range-pills" role="tablist" aria-label="Date range">
+    <button type="button" class="trip-range-pill active" data-range="today">Today</button>
+    <button type="button" class="trip-range-pill" data-range="yesterday">Yesterday</button>
+    <button type="button" class="trip-range-pill" data-range="last3">Last 3 Days</button>
+    <button type="button" class="trip-range-pill" data-range="last5">Last 5 Days</button>
+    <button type="button" class="trip-range-pill" data-range="last7">Last 7 Days</button>
+    <button type="button" class="trip-range-pill" data-range="custom">
+      <i class="bi bi-calendar3 me-1"></i>Custom
+    </button>
+  </div>
+  <div class="trip-custom-range d-none" id="{{ prefix }}CustomRange">
+    <input type="date" id="{{ prefix }}RangeFrom" class="form-control form-control-sm" aria-label="From date">
+    <span class="text-muted-fms">to</span>
+    <input type="date" id="{{ prefix }}RangeTo" class="form-control form-control-sm" aria-label="To date">
+    {% if custom_apply != "no" %}<button type="button" class="btn btn-sm btn-primary" id="{{ prefix }}CustomApply">Apply</button>{% endif %}
+  </div>
+  <div class="dropdown trip-download">
+    <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle trip-download-btn" id="{{ prefix }}DownloadBtn"
+            data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="bi bi-download me-1" aria-hidden="true"></i><span class="trip-download-label">Download Report</span>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end trip-download-menu" aria-labelledby="{{ prefix }}DownloadBtn">
+      <li><h6 class="dropdown-header" id="{{ prefix }}DownloadPeriod">Selected period</h6></li>
+      <li>
+        <button type="button" class="dropdown-item" data-report-download="pdf">
+          <i class="bi bi-file-earmark-pdf text-danger" aria-hidden="true"></i>
+          <span><strong>PDF report</strong><small>{{ pdf_hint }}</small></span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="dropdown-item" data-report-download="xlsx">
+          <i class="bi bi-file-earmark-spreadsheet text-success" aria-hidden="true"></i>
+          <span><strong>Excel workbook</strong><small>{{ xlsx_hint }}</small></span>
+        </button>
+      </li>
+    </ul>
+  </div>
+</div>

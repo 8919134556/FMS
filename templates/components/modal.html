@@ -1,0 +1,28 @@
+{% comment %}
+Global command palette — press Ctrl/Cmd+K or click the navbar search to open.
+Queries apps.accounts.portal_views.quick_search via HTMX; see app.js for the
+keyboard shortcut and focus handling. Included once in base.html.
+{% endcomment %}
+<div class="modal fade command-palette" id="fmsCommandPalette" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="command-palette-input">
+        <i class="bi bi-search"></i>
+        <input
+          type="search"
+          id="fmsCommandPaletteInput"
+          name="q"
+          placeholder="Search users, employee IDs, emails&hellip;"
+          autocomplete="off"
+          hx-get="{% url 'accounts_portal:quick_search' %}"
+          hx-trigger="input changed delay:200ms, focus"
+          hx-target="#fmsCommandPaletteResults"
+        >
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="command-palette-results" id="fmsCommandPaletteResults">
+        <div class="command-palette-empty">Start typing to search users by name, employee ID, or email.</div>
+      </div>
+    </div>
+  </div>
+</div>

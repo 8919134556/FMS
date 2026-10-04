@@ -1,0 +1,13 @@
+{% load fms_extras %}
+{% comment %}
+Skeleton table rows shown briefly via [data-loading-target] in app.js, or included
+statically while a slow fragment loads. Usage:
+  {% include "components/loading.html" with rows=5 cols=6 %}
+{% endcomment %}
+{% for _ in rows|default:5|make_range %}
+  <tr>
+    {% for _ in cols|default:6|make_range %}
+      <td><div class="skeleton" style="height:14px;width:{% cycle '60%' '85%' '40%' '70%' '55%' '90%' %};"></div></td>
+    {% endfor %}
+  </tr>
+{% endfor %}

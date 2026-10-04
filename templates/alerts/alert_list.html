@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Alert Report · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "alert" "update" as can_update %}
+  {% has_module_perm request.user "alert" "archive" as can_archive %}
+
+  <div class="breadcrumb-fms"><span>Reports</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Alert Report</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Alert Report</h1>
+      <p class="page-subtitle">Operational conditions that need attention, generated from live fleet data.</p>
+    </div>
+  </div>
+
+  <div class="dashboard-kpi-grid mb-3">
+    {% include "components/kpi_card.html" with label="Open" value=open_count icon="exclamation-circle" tone="danger" %}
+    {% include "components/kpi_card.html" with label="Acknowledged" value=acknowledged_count icon="hourglass-split" tone="warning" %}
+    {% include "components/kpi_card.html" with label="Critical (unresolved)" value=critical_count icon="exclamation-octagon" tone="danger" %}
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Alerts" count=page_obj.paginator.count %}
+
+    {% if alerts %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Alert</th>
+              <th>Category</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Raised</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alert in alerts %}
+              <tr>
+                <td>
+                  {% if alert.link_url %}<a href="{{ alert.link_url }}">{{ alert.title }}</a>{% else %}{{ alert.title }}{% endif %}
+                  {% if alert.message %}<div class="cell-secondary">{{ alert.message }}</div>{% endif %}
+                </td>
+                <td class="cell-secondary">{{ alert.get_category_display }}</td>
+                <td>
+                  <span class="status-pill tone-{% if alert.severity == 'CRITICAL' or alert.severity == 'HIGH' %}danger{% elif alert.severity == 'MEDIUM' %}warning{% else %}info{% endif %}">
+                    <span class="dot"></span>{{ alert.get_severity_display }}
+                  </span>
+                </td>
+                <td>{% include "components/status_badge.html" with status=alert.status label=alert.get_status_display %}</td>
+                <td class="cell-secondary">{{ alert.created_at|date:"M d, Y H:i" }}</td>
+                <td class="text-end">
+                  <div class="d-flex gap-2 justify-content-end">
+                    {% if can_update and alert.status == "OPEN" %}
+                      <form method="post" action="{% url 'alerts:alert_acknowledge' uuid=alert.uuid %}">
+                        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Acknowledge</button>
+                      </form>
+                    {% endif %}
+                    {% if can_update and alert.status != "RESOLVED" %}
+                      <form method="post" action="{% url 'alerts:alert_resolve' uuid=alert.uuid %}">
+                        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-sm btn-outline-success">Resolve</button>
+                      </form>
+                    {% endif %}
+                    {% if can_archive %}
+                      <form method="post" action="{% url 'alerts:alert_archive' uuid=alert.uuid %}">
+                        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Archive"><i class="bi bi-archive"></i></button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% include "components/empty_state.html" with icon="bell-slash" title="No alerts" message="Nothing needs your attention right now." %}
+    {% endif %}
+  </div>
+{% endblock %}

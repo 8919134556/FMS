@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ user_obj.get_full_name }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "user" "update" as can_update %}
+  {% has_module_perm request.user "user" "archive" as can_activate %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'accounts_portal:user_list' %}">Users</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ user_obj.employee_id }}</span>
+  </div>
+
+  <div class="card-fms p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between gap-3">
+      <div class="d-flex gap-3">
+        <span class="avatar-chip" style="width:56px;height:56px;font-size:1.2rem;">{{ user_obj|initials }}</span>
+        <div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h1 class="page-title" style="font-size:1.4rem;">{{ user_obj.get_full_name }}</h1>
+            {% include "components/status_badge.html" with status=user_obj.status label=user_obj.get_status_display %}
+          </div>
+          <div class="text-secondary-fms text-small mt-1">
+            {{ user_obj.designation|default:"No designation" }}{% if user_obj.department %} &middot; {{ user_obj.department }}{% endif %}
+          </div>
+          <div class="d-flex flex-wrap gap-3 mt-2 text-small text-muted-fms">
+            <span><i class="bi bi-envelope me-1"></i>{{ user_obj.email }}</span>
+            <span><i class="bi bi-telephone me-1"></i>{{ user_obj.mobile_number }}</span>
+            {% if user_obj.role %}<span><i class="bi bi-shield-lock me-1"></i>{{ user_obj.role.name }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap align-items-start">
+        {% if can_update %}
+          <a href="{% url 'accounts_portal:user_edit' uuid=user_obj.uuid %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+        {% endif %}
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% if can_activate %}
+              {% if user_obj.status == "ACTIVE" %}
+                <li>
+                  <form method="post" action="{% url 'accounts_portal:user_lock' uuid=user_obj.uuid %}" data-confirm="Lock {{ user_obj.get_full_name }} out of the portal? They won't be able to sign in until unlocked.">
+                    {% csrf_token %}<button class="dropdown-item"><i class="bi bi-lock me-2"></i>Lock account</button>
+                  </form>
+                </li>
+                <li>
+                  <form method="post" action="{% url 'accounts_portal:user_deactivate' uuid=user_obj.uuid %}" data-confirm="Deactivate {{ user_obj.get_full_name }}? They will lose portal access.">
+                    {% csrf_token %}<button class="dropdown-item"><i class="bi bi-slash-circle me-2"></i>Deactivate</button>
+                  </form>
+                </li>
+              {% elif user_obj.status == "LOCKED" %}
+                <li>
+                  <form method="post" action="{% url 'accounts_portal:user_unlock' uuid=user_obj.uuid %}">
+                    {% csrf_token %}<button class="dropdown-item"><i class="bi bi-unlock me-2"></i>Unlock account</button>
+                  </form>
+                </li>
+              {% else %}
+                <li>
+                  <form method="post" action="{% url 'accounts_portal:user_activate' uuid=user_obj.uuid %}">
+                    {% csrf_token %}<button class="dropdown-item"><i class="bi bi-check-circle me-2"></i>Activate</button>
+                  </form>
+                </li>
+              {% endif %}
+            {% endif %}
+            {% if can_update %}
+              <li>
+                <form method="post" action="{% url 'accounts_portal:user_force_password_reset' uuid=user_obj.uuid %}" data-confirm="Send a password reset email to {{ user_obj.email }}?" data-confirm-tone="primary">
+                  {% csrf_token %}<button class="dropdown-item"><i class="bi bi-key me-2"></i>Force password reset</button>
+                </form>
+              </li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card-fms p-4">
+        <div class="section-title mb-3" style="font-size:.95rem;">Details</div>
+        <dl class="row text-small mb-0" style="row-gap:10px;">
+          <dt class="col-5 text-muted-fms">Employee ID</dt><dd class="col-7 mb-0">{{ user_obj.employee_id }}</dd>
+          <dt class="col-5 text-muted-fms">Username</dt><dd class="col-7 mb-0">@{{ user_obj.username }}</dd>
+          <dt class="col-5 text-muted-fms">Role</dt><dd class="col-7 mb-0">{{ user_obj.role.name|default:"—" }}</dd>
+          <dt class="col-5 text-muted-fms">Client</dt><dd class="col-7 mb-0">{% if user_obj.client %}<a href="{% url 'clients:client_detail' uuid=user_obj.client.uuid %}">{{ user_obj.client.client_name }}</a> <span class="text-small text-muted-fms">(client user &middot; read-only)</span>{% else %}Internal staff{% endif %}</dd>
+          <dt class="col-5 text-muted-fms">Reports to</dt><dd class="col-7 mb-0">{{ user_obj.reporting_manager.get_full_name|default:"—" }}</dd>
+          <dt class="col-5 text-muted-fms">Date joined</dt><dd class="col-7 mb-0">{{ user_obj.date_of_joining|default:"—" }}</dd>
+          <dt class="col-5 text-muted-fms">Last login</dt><dd class="col-7 mb-0">{{ user_obj.last_login|date:"M d, Y H:i"|default:"Never" }}</dd>
+          <dt class="col-5 text-muted-fms">Location</dt><dd class="col-7 mb-0">{{ user_obj.city|default:"—" }}{% if user_obj.state %}, {{ user_obj.state }}{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card-fms p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="section-title" style="font-size:.95rem;">Direct Reports</span>
+          <span class="text-small text-muted-fms">{{ direct_reports.count }}</span>
+        </div>
+        {% if direct_reports %}
+          <div class="d-flex flex-column gap-2">
+            {% for report in direct_reports %}
+              <a href="{% url 'accounts_portal:user_detail' uuid=report.uuid %}" class="d-flex align-items-center justify-content-between text-decoration-none py-1">
+                <span class="d-flex align-items-center gap-2">
+                  <span class="avatar-chip" style="width:26px;height:26px;font-size:10px;">{{ report|initials }}</span>
+                  <span style="color:var(--fms-text-primary);font-size:.82rem;">{{ report.get_full_name }}</span>
+                </span>
+                {% include "components/status_badge.html" with status=report.status label=report.get_status_display %}
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="people" title="No direct reports" message="This user has no one reporting to them." %}
+        {% endif %}
+      </div>
+
+      <div class="card-fms p-4">
+        <span class="section-title" style="font-size:.95rem;">Recent Activity</span>
+        {% if recent_activity %}
+          <div class="d-flex flex-column mt-3" style="gap:10px;">
+            {% for log in recent_activity %}
+              <div class="d-flex justify-content-between align-items-center pb-2" style="border-bottom: 1px solid var(--fms-border);">
+                <span class="d-flex align-items-center gap-2">
+                  {% include "components/status_badge.html" with status=log.action label=log.get_action_display %}
+                  <span class="text-small text-secondary-fms">by {{ log.user.get_full_name|default:"System" }}</span>
+                </span>
+                <span class="text-small text-muted-fms">{{ log.timestamp|date:"M d, Y H:i" }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="journal-text" title="No activity yet" message="Actions on this account will appear here." %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

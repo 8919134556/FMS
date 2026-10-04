@@ -1,0 +1,388 @@
+/* Dispatch Board (Phase 3.2) — tokens only, no raw hex; see design-tokens.css */
+
+.dispatch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--fms-space-2);
+  flex-wrap: wrap;
+}
+
+.dispatch-quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fms-space-2);
+  margin-top: var(--fms-space-3);
+}
+
+.quick-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: var(--fms-radius-full);
+  border: 1px solid var(--fms-border);
+  background: var(--fms-card);
+  color: var(--fms-text-secondary);
+  font-size: var(--fms-text-small);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--fms-duration-fast) var(--fms-ease), color var(--fms-duration-fast) var(--fms-ease);
+}
+
+.quick-filter-pill:hover {
+  background: var(--fms-card-hover);
+  color: var(--fms-text-primary);
+}
+
+.quick-filter-pill.active {
+  background: var(--fms-primary);
+  border-color: var(--fms-primary);
+  color: var(--fms-text-on-accent);
+}
+
+.quick-filter-pill .pill-count {
+  background: var(--fms-surface-2);
+  color: var(--fms-text-secondary);
+  border-radius: var(--fms-radius-full);
+  padding: 1px 7px;
+  font-size: var(--fms-text-tiny);
+  margin-left: 2px;
+}
+
+.quick-filter-pill.active .pill-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--fms-text-on-accent);
+}
+
+/* Trips list KPI row — 5 cards, so it needs its own column count rather
+   than the shared 4-column .dashboard-kpi-grid (which would strand a lone
+   5th card on its own row). */
+.trip-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--fms-space-3);
+}
+@media (max-width: 1199.98px) {
+  .trip-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 767.98px) {
+  .trip-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 479.98px) {
+  .trip-kpi-grid { grid-template-columns: 1fr; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Attention Summary — compact, clickable, tone-restrained. Deliberately   */
+/* not the standard .kpi-card treatment: this page needs alert-chip        */
+/* density, not dashboard-stat-card size.                                 */
+/* ---------------------------------------------------------------------- */
+
+.dispatch-attention-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--fms-space-3);
+}
+
+.dispatch-attention-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--fms-space-3) var(--fms-space-4);
+  border-radius: var(--fms-radius-md);
+  border: 1px solid var(--fms-border);
+  background: var(--fms-card);
+  text-decoration: none;
+  border-left: 3px solid var(--fms-border-strong);
+  transition: border-color var(--fms-duration-fast) var(--fms-ease), background var(--fms-duration-fast) var(--fms-ease);
+}
+
+.dispatch-attention-tile:hover {
+  background: var(--fms-card-hover);
+}
+
+.dispatch-attention-count {
+  font-size: var(--fms-text-metric);
+  font-weight: 700;
+  color: var(--fms-text-primary);
+  line-height: 1.1;
+}
+
+.dispatch-attention-label {
+  font-size: var(--fms-text-small);
+  color: var(--fms-text-secondary);
+  font-weight: 600;
+}
+
+.dispatch-attention-tile.tone-warning { border-left-color: var(--fms-warning); }
+.dispatch-attention-tile.tone-danger { border-left-color: var(--fms-danger); }
+.dispatch-attention-tile.tone-info { border-left-color: var(--fms-info); }
+
+.dispatch-attention-tile.tone-warning .dispatch-attention-count { color: var(--fms-warning); }
+.dispatch-attention-tile.tone-danger .dispatch-attention-count { color: var(--fms-danger); }
+.dispatch-attention-tile.tone-info .dispatch-attention-count { color: var(--fms-info); }
+
+/* A tile at zero is good news, not a missing feature — quiet it down so
+   real attention items keep the visual weight. */
+.dispatch-attention-tile.is-clear {
+  border-left-color: var(--fms-border-strong);
+}
+.dispatch-attention-tile.is-clear .dispatch-attention-count {
+  color: var(--fms-text-muted);
+}
+
+@media (max-width: 767.98px) {
+  .dispatch-attention-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Requires Attention — full-width now, so use the extra room instead of a
+   single narrow column of stacked items. */
+.dispatch-attention-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: var(--fms-space-4);
+}
+@media (max-width: 991.98px) {
+  .dispatch-attention-list { grid-template-columns: 1fr; }
+}
+
+.dispatch-board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--fms-space-4);
+  align-items: start;
+}
+
+.dispatch-board-columns {
+  /* Horizontally-scrolling row, not a fixed 5-up grid: at common desktop
+     widths, 5 tracks with a 220px floor don't fit the main grid track next
+     to the 340px side panel and overflow into it. A scrolling row degrades
+     to "scroll to see more columns" instead of visually breaking. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 1fr);
+  gap: var(--fms-space-3);
+  overflow-x: auto;
+  padding-bottom: var(--fms-space-2);
+}
+
+.dispatch-column {
+  background: var(--fms-card);
+  border: 1px solid var(--fms-border);
+  border-radius: var(--fms-radius-lg);
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  max-height: calc(100vh - 320px);
+}
+
+.dispatch-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--fms-space-3) var(--fms-space-3);
+  border-bottom: 1px solid var(--fms-border);
+  position: sticky;
+  top: 0;
+  background: var(--fms-card);
+  border-top-left-radius: var(--fms-radius-lg);
+  border-top-right-radius: var(--fms-radius-lg);
+}
+
+/* Visual priority: columns that need a decision get a restrained accent;
+   columns that represent healthy forward progress (Ready/Dispatched/In
+   Progress) stay neutral so the two that matter aren't lost among five
+   equally-loud columns. */
+.dispatch-column.emphasis-needs_assignment {
+  border-top: 3px solid var(--fms-warning);
+}
+.dispatch-column.emphasis-needs_assignment .dispatch-column-header {
+  background: var(--fms-warning-soft);
+}
+.dispatch-column.emphasis-delayed {
+  border-top: 3px solid var(--fms-danger);
+}
+.dispatch-column.emphasis-delayed .dispatch-column-header {
+  background: var(--fms-danger-soft);
+}
+
+.dispatch-column-label {
+  font-size: var(--fms-text-small);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--fms-text-secondary);
+}
+
+.dispatch-column-body {
+  padding: var(--fms-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fms-space-2);
+  overflow-y: auto;
+}
+
+.dispatch-column-empty {
+  text-align: center;
+  padding: var(--fms-space-6) var(--fms-space-2);
+  color: var(--fms-text-muted);
+  font-size: var(--fms-text-small);
+}
+
+.dispatch-column-empty i {
+  font-size: 1.25rem;
+  display: block;
+  margin-bottom: var(--fms-space-2);
+}
+
+.dispatch-trip-card {
+  background: var(--fms-bg-elevated);
+  border: 1px solid var(--fms-border);
+  border-radius: var(--fms-radius-md);
+  padding: var(--fms-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dispatch-trip-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fms-space-2);
+}
+
+.dispatch-trip-number {
+  font-weight: 700;
+  font-size: var(--fms-text-body-lg);
+  color: var(--fms-primary);
+  text-decoration: none;
+}
+
+.dispatch-trip-number:hover {
+  text-decoration: underline;
+}
+
+.dispatch-trip-client {
+  font-weight: 600;
+  font-size: var(--fms-text-body);
+  color: var(--fms-text-primary);
+}
+
+.dispatch-trip-resources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.dispatch-trip-resource {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fms-text-small);
+  color: var(--fms-text-secondary);
+}
+
+.dispatch-trip-resource.is-unassigned {
+  color: var(--fms-warning);
+  font-weight: 600;
+}
+
+.dispatch-trip-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fms-space-2);
+  margin-top: var(--fms-space-2);
+}
+
+.dispatch-trip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dispatch-resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fms-space-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.dispatch-resource-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fms-space-2);
+  padding: var(--fms-space-2);
+  border: 1px solid var(--fms-border);
+  border-radius: var(--fms-radius-sm);
+}
+
+/* ---- Responsive: stack below 768px, horizontal-scroll 768-1024px, full 5-up beyond ---- */
+@media (max-width: 1023px) {
+  .dispatch-board-layout {
+    /* minmax(0, ...) — a bare 1fr track can't shrink below its content, so the
+       horizontally-scrolling column row was widening the whole page at 768px. */
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dispatch-board-main, .dispatch-board-side { min-width: 0; }
+}
+
+/* Mobile column switcher — one workflow column at a time instead of five
+   compressed into unreadable slivers. */
+.dispatch-column-nav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  margin-top: var(--fms-space-3);
+}
+
+.dispatch-column-nav-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--fms-radius-full);
+  border: 1px solid var(--fms-border);
+  background: var(--fms-card);
+  color: var(--fms-text-secondary);
+  font-size: var(--fms-text-small);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dispatch-column-nav-btn.active {
+  background: var(--fms-primary);
+  border-color: var(--fms-primary);
+  color: var(--fms-text-on-accent);
+}
+
+.dispatch-column-nav-btn.active .pill-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--fms-text-on-accent);
+}
+
+@media (max-width: 767px) {
+  .dispatch-board-columns {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+  .dispatch-column {
+    max-height: none;
+  }
+  .dispatch-column[data-mobile-hidden] {
+    display: none;
+  }
+  .dispatch-filters-panel {
+    display: none;
+  }
+  .dispatch-filters-panel.is-open {
+    display: block;
+  }
+}

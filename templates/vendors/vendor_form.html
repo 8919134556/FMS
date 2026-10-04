@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Vendor{% else %}New Vendor{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'vendors:vendor_list' %}">Vendors</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.vendor_name }}{% else %}New Vendor{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="truck" title="Basic Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.vendor_code.label }}</label>
+          {{ form.vendor_code }}
+          {% if form.vendor_code.errors %}<div class="invalid-feedback d-block">{{ form.vendor_code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.vendor_name.label }}</label>
+          {{ form.vendor_name }}
+          {% if form.vendor_name.errors %}<div class="invalid-feedback d-block">{{ form.vendor_name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.vendor_type.label }}</label>
+          {{ form.vendor_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="person-vcard" title="Contact" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.contact_person.label }}</label>
+          {{ form.contact_person }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.email.label }}</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.phone.label }}</label>
+          {{ form.phone }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="pin-map" title="Address" %}
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">{{ form.address.label }}</label>
+          {{ form.address }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.city.label }}</label>
+          {{ form.city }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.state.label }}</label>
+          {{ form.state }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.country.label }}</label>
+          {{ form.country }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.pincode.label }}</label>
+          {{ form.pincode }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'vendors:vendor_detail' uuid=object.uuid %}{% else %}{% url 'vendors:vendor_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Vendor…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Vendor{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

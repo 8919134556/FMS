@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ site.site_name }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "site" "update" as can_update %}
+  {% has_module_perm request.user "site" "archive" as can_archive %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'locations:site_list' %}">Sites</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ site.site_name }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-geo-alt"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ site.site_name }}</h1>
+          {% include "components/status_badge.html" with status=site.status label=site.get_status_display %}
+        </div>
+        <p class="page-subtitle mb-0">
+          {{ site.site_code }} &middot; {{ site.get_site_type_display }}
+          &middot; <a href="{% url 'clients:client_detail' uuid=site.client.uuid %}">{{ site.client.client_name }}</a>
+          {% if site.branch %} &middot; {{ site.branch.name }}{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_update %}
+        <a href="{% url 'locations:site_edit' uuid=site.uuid %}" class="btn btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+      {% endif %}
+      {% if can_archive %}
+        {% if site.status == "ACTIVE" %}
+          <form method="post" action="{% url 'locations:site_deactivate' uuid=site.uuid %}" data-confirm="Deactivate {{ site.site_name }}?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-slash-circle me-1"></i>Deactivate</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'locations:site_activate' uuid=site.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Activate</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% include "components/tabs.html" with tabs=tab_list active=active_tab %}
+
+  <div class="mt-3">
+    {% if active_tab == "trips" %}
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Outbound Trips (origin)</span>
+        {% if origin_trips %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Trip</th><th>Client</th><th>Destination</th><th>Vehicle</th><th>Schedule</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for trip in origin_trips %}
+                  <tr>
+                    <td><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}">{{ trip.trip_number }}</a></td>
+                    <td class="cell-secondary">{{ trip.client.client_name }}</td>
+                    <td class="cell-secondary">{{ trip.destination_site.site_name }}</td>
+                    <td class="cell-secondary">{% if trip.vehicle %}{{ trip.vehicle.registration_number }}{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{{ trip.scheduled_start|date:"M d, H:i" }}</td>
+                    <td>{% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No outbound trips" message="Trips starting at this site will appear here." %}
+        {% endif %}
+      </div>
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Inbound Trips (destination)</span>
+        {% if destination_trips %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Trip</th><th>Client</th><th>Origin</th><th>Vehicle</th><th>Schedule</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for trip in destination_trips %}
+                  <tr>
+                    <td><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}">{{ trip.trip_number }}</a></td>
+                    <td class="cell-secondary">{{ trip.client.client_name }}</td>
+                    <td class="cell-secondary">{{ trip.origin_site.site_name }}</td>
+                    <td class="cell-secondary">{% if trip.vehicle %}{{ trip.vehicle.registration_number }}{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{{ trip.scheduled_start|date:"M d, H:i" }}</td>
+                    <td>{% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No inbound trips" message="Trips ending at this site will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "documents" %}
+      {% include "components/document_tab.html" with documents=documents entity_type="site" object_id=site.id %}
+
+    {% elif active_tab == "history" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+
+    {% else %}
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="card-fms mb-3">
+            <span class="section-title" style="font-size:.95rem;">Site Information</span>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4"><div class="cell-secondary">Type</div><div>{{ site.get_site_type_display }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Client</div><div><a href="{% url 'clients:client_detail' uuid=site.client.uuid %}">{{ site.client.client_name }}</a></div></div>
+              <div class="col-md-4"><div class="cell-secondary">Branch</div><div>{{ site.branch.name|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Operating Hours</div><div>{{ site.operating_hours|default:"—" }}</div></div>
+              <div class="col-md-8"><div class="cell-secondary">Address</div><div>{{ site.address_line_1|default:"—" }}{% if site.city %}, {{ site.city }}{% endif %}{% if site.state %}, {{ site.state }}{% endif %}{% if site.pincode %} — {{ site.pincode }}{% endif %}</div></div>
+              {% if site.latitude and site.longitude %}
+                <div class="col-md-4"><div class="cell-secondary">Coordinates</div><div>{{ site.latitude }}, {{ site.longitude }}</div></div>
+              {% endif %}
+            </div>
+          </div>
+          {% if site.notes %}
+            <div class="card-fms">
+              <span class="section-title" style="font-size:.95rem;">Notes</span>
+              <p class="text-small mb-0 mt-2">{{ site.notes }}</p>
+            </div>
+          {% endif %}
+        </div>
+        <div class="col-lg-4">
+          <div class="card-fms">
+            <span class="section-title" style="font-size:.95rem;">Site Contact</span>
+            <div class="d-flex flex-column gap-2 mt-2">
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Name</span><span>{{ site.contact_name|default:"—" }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Phone</span><span>{{ site.contact_phone|default:"—" }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Email</span><span>{{ site.contact_email|default:"—" }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

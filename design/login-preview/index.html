@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign In · Zentora Fleet Management System</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="page">
+    <div class="scene">
+
+      <!-- ============ Main login composition ============ -->
+      <div class="login-card">
+
+        <!-- ============ LEFT: branding panel — transparent over the fleet photo ============ -->
+        <section class="brand-panel" aria-label="Zentora Fleet Management System">
+          <div class="brand-scrim" aria-hidden="true"></div>
+
+          <div class="brand-top">
+            <div class="logo-chip">
+              <!-- Replace assets/zentora-logo.png with the real logo file. Never recreated with CSS/text. -->
+              <img src="assets/zentora-logo.png" alt="Zentora Info Global Solutions" class="brand-logo">
+            </div>
+          </div>
+
+          <div class="brand-main">
+            <h1 class="brand-heading">Fleet Management<br>System</h1>
+            <p class="brand-tagline">Smarter Fleet. Safer Roads. Better Business.</p>
+            <p class="brand-support">
+              Real-time tracking, intelligent monitoring and actionable fleet
+              insights — all in one platform.
+            </p>
+          </div>
+
+          <ul class="brand-features">
+            <li class="feature">
+              <i data-lucide="radar" aria-hidden="true"></i>
+              <span>Real-Time Tracking</span>
+            </li>
+            <li class="feature">
+              <i data-lucide="bell-ring" aria-hidden="true"></i>
+              <span>Live Alerts</span>
+            </li>
+            <li class="feature">
+              <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+              <span>Fleet Analytics</span>
+            </li>
+          </ul>
+        </section>
+
+        <!-- ============ RIGHT: dark navy glass sign-in panel ============ -->
+        <section class="signin-panel" aria-label="Sign in">
+          <div class="signin-inner">
+
+            <span class="eyebrow">Welcome Back</span>
+            <h2 class="signin-heading">Sign in to your account</h2>
+            <p class="signin-sub">Access your fleet, vehicles and live tracking dashboard.</p>
+
+            <form id="loginForm" class="login-form" novalidate>
+
+              <!-- Ready for backend validation errors -->
+              <div class="form-alert" id="formAlert" role="alert" aria-live="assertive" hidden>
+                <i data-lucide="alert-circle" aria-hidden="true"></i>
+                <span id="formAlertText"></span>
+              </div>
+
+              <div class="field">
+                <label for="username">Email or Username</label>
+                <div class="input-shell">
+                  <i data-lucide="user" class="input-icon icon-accent" aria-hidden="true"></i>
+                  <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    placeholder="Enter your email or username"
+                    autocomplete="username"
+                    required
+                    aria-required="true"
+                    aria-describedby="usernameError"
+                  >
+                </div>
+                <span class="field-error" id="usernameError" aria-live="polite"></span>
+              </div>
+
+              <div class="field">
+                <label for="password">Password</label>
+                <div class="input-shell">
+                  <i data-lucide="lock" class="input-icon" aria-hidden="true"></i>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                    aria-required="true"
+                    aria-describedby="passwordError"
+                  >
+                  <button type="button" class="icon-btn password-toggle" id="passwordToggle" aria-label="Show password" aria-pressed="false">
+                    <i data-lucide="eye" id="eyeIcon" aria-hidden="true"></i>
+                    <i data-lucide="eye-off" id="eyeOffIcon" aria-hidden="true" hidden></i>
+                  </button>
+                </div>
+                <span class="field-error" id="passwordError" aria-live="polite"></span>
+              </div>
+
+              <div class="field-row">
+                <label class="checkbox">
+                  <input type="checkbox" id="rememberMe" name="rememberMe" class="checkbox-input">
+                  <span>Remember me</span>
+                </label>
+                <a href="#" id="forgotPasswordLink" class="link-muted placeholder-link">Forgot password?</a>
+              </div>
+
+              <button type="submit" class="signin-button" id="signinButton">
+                <span class="btn-label">Sign In</span>
+                <i data-lucide="arrow-right" class="btn-icon" aria-hidden="true"></i>
+                <span class="btn-spinner" aria-hidden="true"></span>
+              </button>
+
+              <p class="security-note">
+                <i data-lucide="shield-check" aria-hidden="true"></i>
+                Secure access protected with encrypted authentication.
+              </p>
+
+              <p class="terms-note">
+                By signing in, you agree to our
+                <a href="#" class="placeholder-link">Terms of Service</a> and
+                <a href="#" class="placeholder-link">Privacy Policy</a>.
+              </p>
+            </form>
+
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ============ Footer — integrated, matches the card width ============ -->
+      <footer class="page-footer">
+        <span>&copy; 2026 Zentora Info Global Solutions. All rights reserved.</span>
+        <span class="footer-secondary">Fleet Management Platform</span>
+      </footer>
+
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="script.js"></script>
+</body>
+</html>

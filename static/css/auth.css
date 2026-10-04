@@ -1,0 +1,401 @@
+/*
+ * FMS Authentication Experience
+ * Covers every page that extends templates/base_auth.html: login, password
+ * reset (all states), and the 403/404 error pages.
+ *
+ * Layout: a full-bleed scene, one large glass card split into a transparent
+ * brand/hero panel (left) and a frosted-blue form panel (right), with the
+ * copyright line under the card. The background is the company-supplied
+ * panorama static/images/login-bg.jpg (truck left, skyline + plane right).
+ * Swap the file to change the picture; keep the truck on the left third.
+ *
+ * This page has its own fixed look (it doesn't follow the app's light/dark
+ * theme), so colours here are literal on purpose.
+ */
+
+/* ---------------------------------------------------------------------- */
+/* 1. Stage (background) + card                                            */
+/* ---------------------------------------------------------------------- */
+
+body.auth-body {
+  margin: 0;
+  min-height: 100vh;
+  color: #fff;
+  background: #16305c;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.auth-stage {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 44px 20px 30px;
+  background-color: #16305c;
+  background-image: url("../images/login-bg.jpg");
+  background-size: cover;
+  /* The panorama is ~2.1:1, wider than most screens, so `cover` crops the sides.
+     30% keeps the truck fully in frame while still showing the plane/skyline. */
+  background-position: 30% center;
+  background-repeat: no-repeat;
+}
+
+/* Gentle vignette so the card and footer stay legible on any photo. */
+.auth-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(12, 32, 74, 0.04) 0%, rgba(12, 32, 74, 0.12) 55%, rgba(12, 32, 74, 0.5) 100%);
+  pointer-events: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: min(880px, 100%);
+  min-height: 470px;
+  display: grid;
+  grid-template-columns: 1.61fr 1fr;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 30px 80px rgba(6, 20, 52, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ---------------------------------------------------------------------- */
+/* 2. Left: brand header + headline (photo shows through)                  */
+/* ---------------------------------------------------------------------- */
+
+.auth-showcase {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.auth-logo-bar {
+  display: flex;
+  align-items: center;
+  height: 118px;
+  padding: 0 44px;
+  background: linear-gradient(180deg, #ffffff 0%, #eaf1fb 100%);
+  border-bottom-right-radius: 55% 42px;
+  box-shadow: 0 8px 26px rgba(10, 30, 70, 0.18);
+}
+
+.auth-logo {
+  display: block;
+  width: min(275px, 100%);
+  height: auto;
+}
+
+.auth-showcase-title {
+  margin: 28px 0 0 48px;
+  font-size: 1.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(8, 28, 70, 0.55);
+}
+
+/* ---------------------------------------------------------------------- */
+/* 3. Right: frosted sign-in panel                                         */
+/* ---------------------------------------------------------------------- */
+
+.auth-panel {
+  position: relative;
+  padding: 30px 30px 24px;
+  background: linear-gradient(180deg, rgba(40, 78, 152, 0.78) 0%, rgba(28, 58, 122, 0.88) 100%);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: blur(16px) saturate(1.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  min-width: 0;
+
+  /* Re-scope the shared tokens so components.css classes used by the other
+     auth pages (password reset, 403/404) render correctly on this panel. */
+  --fms-text-primary: #ffffff;
+  --fms-text-secondary: rgba(255, 255, 255, 0.86);
+  --fms-text-muted: rgba(255, 255, 255, 0.72);
+  --fms-border: rgba(255, 255, 255, 0.35);
+}
+
+.auth-title {
+  margin: 0 0 18px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+}
+.auth-product {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  font-weight: 400;
+  color: #fff;
+}
+.auth-lede {
+  margin: 0 0 24px;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.auth-form { display: flex; flex-direction: column; }
+.auth-field { margin-bottom: 16px; }
+.auth-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.auth-input-shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 6px;
+  background: rgba(12, 30, 72, 0.36);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.auth-input-shell:focus-within {
+  border-color: #79bcff;
+  background: rgba(12, 30, 72, 0.5);
+  box-shadow: 0 0 0 3px rgba(80, 160, 255, 0.28);
+}
+.auth-input-shell > .bi { font-size: 1.05rem; color: #fff; flex-shrink: 0; }
+.auth-input-shell > .bi.icon-accent { color: #7fd957; }
+
+/* Doubled selector: must out-rank the generic .form-control in components.css
+   so the field itself is invisible and only the shell draws the box. */
+.auth-panel .auth-input-shell .form-control.form-control {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #fff;
+  font-size: 0.9rem;
+}
+.auth-panel .auth-input-shell .form-control.form-control::placeholder { color: rgba(255, 255, 255, 0.72); opacity: 1; }
+.auth-panel .auth-input-shell .form-control.form-control:focus { outline: none; box-shadow: none; background: transparent; color: #fff; }
+.auth-input-shell .form-control:-webkit-autofill,
+.auth-input-shell .form-control:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+  transition: background-color 9999s ease-out 0s;
+  box-shadow: 0 0 0 40px rgba(20, 44, 98, 0.95) inset;
+}
+
+.auth-password-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+.auth-password-toggle:hover { background: rgba(255, 255, 255, 0.14); }
+
+.auth-field-error { display: block; margin-top: 6px; font-size: 0.85rem; color: #ffc0c0; }
+
+.auth-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 170, 170, 0.6);
+  border-radius: 6px;
+  background: rgba(214, 48, 48, 0.28);
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+.auth-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #fff;
+  font-size: 0.87rem;
+  cursor: pointer;
+}
+.auth-checkbox input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-radius: 4px;
+  accent-color: #3d8bfd;
+  cursor: pointer;
+}
+.auth-link { color: #fff; font-size: 0.87rem; text-decoration: underline; text-underline-offset: 3px; }
+.auth-link:hover { color: #bfe0ff; }
+
+.auth-submit {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #3391f3 0%, #1d63d8 100%);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 20px rgba(18, 86, 214, 0.45);
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.auth-submit:hover { filter: brightness(1.08); }
+.auth-submit:active { transform: translateY(1px); }
+.auth-submit:focus-visible { outline: 3px solid rgba(160, 210, 255, 0.7); outline-offset: 2px; }
+.auth-submit .btn-spinner {
+  display: none;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: auth-spin 0.7s linear infinite;
+}
+.auth-submit.is-loading .btn-spinner { display: inline-block; }
+.auth-submit[disabled] { opacity: 0.85; cursor: progress; }
+@keyframes auth-spin { to { transform: rotate(360deg); } }
+
+.auth-terms {
+  margin: 20px 0 0;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: #fff;
+}
+.auth-terms a { color: #7cc4ff; text-decoration: underline; text-underline-offset: 2px; }
+.auth-terms a:hover { color: #bfe0ff; }
+
+/* Page footer, under the card */
+.auth-footer {
+  position: relative;
+  z-index: 1;
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(8, 24, 60, 0.6);
+}
+
+/* ---------------------------------------------------------------------- */
+/* 4. Other auth pages that reuse the generic component classes            */
+/*    (password reset, 403, 404) — restyled for the frosted panel          */
+/* ---------------------------------------------------------------------- */
+
+.auth-panel .section-title { color: #fff; font-size: 1.6rem; font-weight: 600; }
+.auth-panel .text-secondary-fms,
+.auth-panel .text-muted-fms { color: rgba(255, 255, 255, 0.82) !important; }
+.auth-panel .form-label { color: #fff; font-weight: 600; }
+.auth-panel .required-mark::after { color: #ffb4b4; }
+.auth-panel .form-control {
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 6px;
+  background: rgba(12, 30, 72, 0.36);
+  color: #fff;
+}
+.auth-panel .form-control::placeholder { color: rgba(255, 255, 255, 0.7); }
+.auth-panel .form-control:focus {
+  border-color: #79bcff;
+  background: rgba(12, 30, 72, 0.5);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(80, 160, 255, 0.28);
+}
+/* Django's stock forms (password reset/confirm) render bare <input>s with no
+   .form-control class — give them the same glass field. */
+.auth-panel form input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not(.form-control) {
+  display: block;
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 6px;
+  background: rgba(12, 30, 72, 0.36);
+  color: #fff;
+  font-size: 0.98rem;
+}
+.auth-panel form input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not(.form-control):focus {
+  outline: none;
+  border-color: #79bcff;
+  box-shadow: 0 0 0 3px rgba(80, 160, 255, 0.28);
+}
+.auth-panel form ul { padding-left: 1.1rem; font-size: 0.85rem; color: rgba(255, 255, 255, 0.8); }
+.auth-panel .btn-primary {
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #3391f3 0%, #1d63d8 100%);
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(18, 86, 214, 0.4);
+}
+.auth-panel .btn-primary:hover { filter: brightness(1.08); }
+.auth-panel a:not(.btn):not(.auth-link) { color: #9fd0ff; text-decoration: underline; text-underline-offset: 3px; }
+.auth-panel .invalid-feedback { color: #ffc0c0; }
+.auth-panel .alert-danger { background: rgba(214, 48, 48, 0.28); border-color: rgba(255, 170, 170, 0.6); color: #fff; }
+.auth-panel .alert-warning { background: rgba(245, 158, 11, 0.25); border-color: rgba(253, 224, 71, 0.5); color: #fff; }
+.auth-panel .alert-info,
+.auth-panel .alert-success { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.4); color: #fff; }
+
+/* ---------------------------------------------------------------------- */
+/* 5. Responsive                                                           */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  /* Tall phone screens show a narrow slice — keep it on the truck. */
+  .auth-stage { background-position: 14% center; }
+}
+
+@media (max-width: 991.98px) {
+  .auth-stage { padding: 28px 16px 24px; justify-content: flex-start; }
+  .auth-card { grid-template-columns: 1fr; min-height: 0; max-width: 560px; }
+  .auth-logo-bar { height: 112px; padding: 0 32px; border-bottom-right-radius: 50% 30px; }
+  .auth-logo { width: min(270px, 100%); }
+  .auth-showcase { min-height: 230px; }
+  .auth-showcase-title { margin: 26px 0 0 34px; font-size: 1.7rem; }
+  .auth-panel { border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.16); padding: 34px 30px 28px; }
+}
+
+@media (max-width: 575.98px) {
+  .auth-stage { padding: 16px 12px 20px; }
+  .auth-logo-bar { height: 96px; padding: 0 22px; }
+  .auth-logo { width: min(220px, 100%); }
+  .auth-showcase { min-height: 190px; }
+  .auth-showcase-title { margin: 20px 0 0 22px; font-size: 1.4rem; }
+  .auth-panel { padding: 28px 22px 24px; }
+  .auth-title { font-size: 1.6rem; margin-bottom: 20px; }
+  .auth-product { font-size: 1.25rem; }
+  .auth-lede { font-size: 1.05rem; margin-bottom: 26px; }
+  .auth-row { flex-wrap: wrap; }
+  .auth-terms { white-space: normal; }
+  .auth-submit { font-size: 1.15rem; height: 50px; }
+}

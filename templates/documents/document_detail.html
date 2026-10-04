@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ document.document_number }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "document" "update" as can_update %}
+  {% has_module_perm request.user "document" "archive" as can_archive %}
+  {% has_module_perm request.user "document" "delete" as can_delete %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'documents:document_list' %}">Documents</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ document.document_number }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-file-earmark-text"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ document.title }}</h1>
+          {% include "components/status_badge.html" with status=document.status label=document.get_status_display %}
+          {% if document.expiry_status == "EXPIRED" %}
+            {% include "components/status_badge.html" with status="EXPIRED" label=document.expiry_label %}
+          {% elif document.expiry_status == "EXPIRING_SOON" %}
+            {% include "components/status_badge.html" with status="EXPIRING_SOON" label=document.expiry_label %}
+          {% endif %}
+          {% if not document.is_current_version %}
+            {% include "components/status_badge.html" with status="NO_EXPIRY" label="Superseded" %}
+          {% endif %}
+        </div>
+        <p class="page-subtitle mb-0">
+          {{ document.document_number }} &middot; {{ document.get_document_type_display }}
+          {% if entity_url %} &middot; <a href="{{ entity_url }}">{{ entity_label }}: {{ document.content_object }}</a>{% else %} &middot; {{ entity_label }}{% endif %}
+          &middot; v{{ document.version }}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'documents:document_download' uuid=document.uuid %}" class="btn btn-primary"><i class="bi bi-download me-1"></i>Download</a>
+      {% if can_update %}
+        <a href="{% url 'documents:document_edit' uuid=document.uuid %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+      {% endif %}
+      {% if can_update and document.is_current_version %}
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#replaceDocumentModal"><i class="bi bi-arrow-repeat me-1"></i>Replace</button>
+      {% endif %}
+      {% if can_archive %}
+        {% if document.status == "ACTIVE" %}
+          <form method="post" action="{% url 'documents:document_archive' uuid=document.uuid %}" data-confirm="Archive {{ document.title }}?">{% csrf_token %}<button type="submit" class="btn btn-outline-warning"><i class="bi bi-archive me-1"></i>Archive</button></form>
+        {% else %}
+          <form method="post" action="{% url 'documents:document_restore' uuid=document.uuid %}">{% csrf_token %}<button type="submit" class="btn btn-outline-success"><i class="bi bi-arrow-counterclockwise me-1"></i>Restore</button></form>
+        {% endif %}
+      {% endif %}
+      {% if can_delete %}
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteDocumentModal"><i class="bi bi-trash me-1"></i>Delete</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">File</span>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4"><div class="cell-secondary">Filename</div><div>{{ document.original_filename }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Size</div><div>{{ document.file_size_display }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Type</div><div>{{ document.mime_type|default:"—" }}</div></div>
+        </div>
+        {% if document.is_previewable %}
+          <div class="mt-3" style="border:1px solid var(--fms-border); border-radius:10px; overflow:hidden; max-height:480px;">
+            <iframe src="{% url 'documents:document_preview' uuid=document.uuid %}" style="width:100%; height:480px; border:0;" title="Document preview"></iframe>
+          </div>
+        {% else %}
+          <div class="widget-locked mt-3">
+            <div class="empty-icon"><i class="bi bi-file-earmark"></i></div>
+            <h4>No inline preview for this file type</h4>
+            <p>Use Download to open this file.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if document.description %}
+        <div class="card-fms mb-3">
+          <span class="section-title" style="font-size:.95rem;">Description</span>
+          <p class="text-small mb-0 mt-2">{{ document.description }}</p>
+        </div>
+      {% endif %}
+      {% if document.notes %}
+        <div class="card-fms mb-3">
+          <span class="section-title" style="font-size:.95rem;">Notes</span>
+          <p class="text-small mb-0 mt-2">{{ document.notes }}</p>
+        </div>
+      {% endif %}
+
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Metadata</span>
+        <div class="d-flex flex-column gap-2 mt-2">
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Uploaded By</span><span>{{ document.created_by.get_full_name|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Uploaded At</span><span>{{ document.created_at|date:"M d, Y H:i" }}</span></div>
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Issue Date</span><span>{{ document.issue_date|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Expiry Date</span><span>{{ document.expiry_date|default:"Never" }}</span></div>
+        </div>
+      </div>
+
+      {% if version_history|length > 1 %}
+        <div class="card-fms">
+          <span class="section-title" style="font-size:.95rem;">Version History</span>
+          <div class="timeline mt-3">
+            {% for version in version_history %}
+              <div class="timeline-item">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <a href="{% url 'documents:document_detail' uuid=version.uuid %}" class="fw-semibold text-decoration-none">v{{ version.version }}</a>
+                    {% if version.pk == document.pk %}<span class="cell-secondary">(this version)</span>{% endif %}
+                    <div class="cell-secondary">{{ version.created_at|date:"M d, Y" }} &middot; {{ version.original_filename }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if can_update and document.is_current_version %}
+    <div class="modal fade" id="replaceDocumentModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'documents:document_replace' uuid=document.uuid %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Upload New Version</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <label class="form-label required-mark">{{ replace_form.file.label }}</label>
+              {{ replace_form.file }}
+              <p class="text-small text-muted-fms mt-2 mb-0"><i class="bi bi-info-circle me-1"></i>The current file becomes version {{ document.version }} in history; this becomes version {{ document.version|add:1 }}.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Upload New Version</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if can_delete %}
+    <div class="modal fade" id="deleteDocumentModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content">
+          <form method="post" action="{% url 'documents:document_delete' uuid=document.uuid %}">
+            {% csrf_token %}
+            <div class="modal-body pt-4 px-4 text-center">
+              <div class="empty-icon mx-auto mb-3" style="background: var(--fms-danger-soft); color: var(--fms-danger);"><i class="bi bi-exclamation-triangle"></i></div>
+              <h3 class="section-title mb-2">Delete Document?</h3>
+              <p class="text-secondary-fms mb-0">This permanently removes the document and cannot be undone.</p>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-danger">Delete Permanently</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

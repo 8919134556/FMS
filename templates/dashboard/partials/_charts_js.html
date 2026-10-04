@@ -1,0 +1,134 @@
+<script>
+  (function () {
+    if (typeof Chart === "undefined") return; // CDN blocked: tables/cards still work, charts just don't draw.
+
+    const DATA = {
+      tripTrend: {{ trip_trend_json|safe }},
+      tripStatus: {{ trip_status_json|safe }},
+      fleet: {{ fleet_status_json|safe }},
+      activity: {{ activity_trend_json|safe }},
+      usersByRole: {{ users_by_role_json|safe }},
+      usersByStatus: {{ users_by_status_json|safe }},
+    };
+
+    const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    function tokens() {
+      return {
+        grid: token("--fms-border"), text: token("--fms-text-muted"), surface: token("--fms-surface"),
+        primary: token("--fms-primary"), primaryRgb: token("--fms-primary-rgb"),
+        info: token("--fms-info"), success: token("--fms-success"), warning: token("--fms-warning"),
+        danger: token("--fms-danger"), purple: token("--fms-purple"),
+      };
+    }
+
+    const legend = { position: "bottom", labels: { boxWidth: 10, usePointStyle: true } };
+    const charts = {};
+
+    function draw(id, factory) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (charts[id]) charts[id].destroy();
+      const t = tokens();
+      Chart.defaults.color = t.text;
+      Chart.defaults.font.family = "Inter, sans-serif";
+      charts[id] = new Chart(el, factory(t));
+    }
+
+    const builders = {
+      tripTrendChart: (t) => ({
+        type: "bar",
+        data: {
+          labels: DATA.tripTrend.labels,
+          datasets: [
+            { type: "bar", label: "Scheduled", data: DATA.tripTrend.total, backgroundColor: `rgba(${t.primaryRgb}, 0.28)`, borderColor: t.primary, borderWidth: 1, borderRadius: 4 },
+            { type: "line", label: "Completed", data: DATA.tripTrend.completed, borderColor: t.success, backgroundColor: "transparent", tension: 0.35, pointRadius: 3, borderWidth: 2 },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: { legend },
+          scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid } } },
+        },
+      }),
+      tripStatusChart: (t) => ({
+        type: "doughnut",
+        data: {
+          labels: DATA.tripStatus.labels,
+          datasets: [{
+            data: DATA.tripStatus.data,
+            backgroundColor: [t.purple, t.info, t.primary, t.primary, t.success, t.warning, t.danger],
+            borderColor: t.surface, borderWidth: 2,
+          }],
+        },
+        options: { maintainAspectRatio: false, cutout: "66%", plugins: { legend } },
+      }),
+      fleetLifecycleChart: (t) => {
+        const colors = { Active: t.success, "Under Maintenance": t.warning, Accident: t.danger };
+        return {
+          type: "doughnut",
+          data: {
+            labels: DATA.fleet.labels,
+            datasets: [{ data: DATA.fleet.data, backgroundColor: DATA.fleet.labels.map((l) => colors[l] || t.text), borderColor: t.surface, borderWidth: 2 }],
+          },
+          options: {
+            maintainAspectRatio: false, cutout: "66%", plugins: { legend },
+            onClick: (evt, els) => {
+              if (!els.length) return;
+              const map = { Active: "ACTIVE", Inactive: "INACTIVE", "Under Maintenance": "UNDER_MAINTENANCE", Accident: "ACCIDENT", Sold: "SOLD", Retired: "RETIRED", Scrapped: "SCRAPPED" };
+              const status = map[DATA.fleet.labels[els[0].index]];
+              if (status) window.location.href = `/fleet/vehicles/?status=${status}`;
+            },
+          },
+        };
+      }),
+      activityTrendChart: (t) => ({
+        type: "line",
+        data: {
+          labels: DATA.activity.labels,
+          datasets: [
+            { label: "All Activity", data: DATA.activity.activity, borderColor: t.primary, backgroundColor: `rgba(${t.primaryRgb}, 0.12)`, fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2 },
+            { label: "Logins", data: DATA.activity.logins, borderColor: t.info, backgroundColor: "transparent", tension: 0.35, pointRadius: 0, borderWidth: 2, borderDash: [4, 4] },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: { legend },
+          scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid } } },
+        },
+      }),
+      usersByRoleChart: (t) => ({
+        type: "bar",
+        data: { labels: DATA.usersByRole.labels, datasets: [{ label: "Users", data: DATA.usersByRole.data, backgroundColor: `rgba(${t.primaryRgb}, 0.5)`, borderColor: t.primary, borderWidth: 1, borderRadius: 4 }] },
+        options: {
+          indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid } }, y: { grid: { display: false } } },
+        },
+      }),
+      usersByStatusChart: (t) => {
+        const colors = { Active: t.success, Inactive: t.text, Suspended: t.warning, Locked: t.danger, Invited: t.info };
+        return {
+          type: "doughnut",
+          data: {
+            labels: DATA.usersByStatus.labels,
+            datasets: [{ data: DATA.usersByStatus.data, backgroundColor: DATA.usersByStatus.labels.map((l) => colors[l] || t.text), borderColor: t.surface, borderWidth: 2 }],
+          },
+          options: { maintainAspectRatio: false, cutout: "66%", plugins: { legend } },
+        };
+      },
+    };
+
+    // draw() skips any chart whose canvas isn't on the page — canvases are
+    // rendered only for widgets the viewer's permissions allow.
+    function buildAll() {
+      Object.keys(builders).forEach((id) => draw(id, builders[id]));
+    }
+    buildAll();
+
+    // Chart.js bakes theme colors in at draw time, so re-tint on theme switch.
+    new MutationObserver((mutations) => {
+      if (mutations.some((m) => m.attributeName === "data-theme")) window.setTimeout(buildAll, 50);
+    }).observe(document.documentElement, { attributes: true });
+  })();
+</script>

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Device{% else %}New Device{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'tracking:device_list' %}">GPS Devices</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.imei }}{% else %}New GPS Device{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required. Vehicle assignment and status are managed from the device's detail page.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="cpu" title="Device Identification" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.name.label }}</label>
+          {{ form.name }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.imei.label }}</label>
+          {{ form.imei }}
+          {% if form.imei.errors %}<div class="invalid-feedback d-block">{{ form.imei.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.serial_number.label }}</label>
+          {{ form.serial_number }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.provider.label }}</label>
+          {{ form.provider }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.device_model.label }}</label>
+          {{ form.device_model }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.manufacturer.label }}</label>
+          {{ form.manufacturer }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.firmware_version.label }}</label>
+          {{ form.firmware_version }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.sim_number.label }}</label>
+          {{ form.sim_number }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.sim_provider.label }}</label>
+          {{ form.sim_provider }}
+        </div>
+      </div>
+    </div>
+
+    {% if not object %}
+      <div class="alert alert-info d-flex align-items-start gap-2">
+        <i class="bi bi-key mt-1"></i>
+        <div>A device ingestion key will be generated and shown once immediately after saving — copy it into the device's configuration right away.</div>
+      </div>
+    {% endif %}
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'tracking:device_detail' uuid=object.uuid %}{% else %}{% url 'tracking:device_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">{% if object %}Save Changes{% else %}Save Device{% endif %}</button>
+    </div>
+  </form>
+{% endblock %}

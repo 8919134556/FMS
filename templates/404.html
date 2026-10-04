@@ -1,0 +1,12 @@
+{% extends "base_auth.html" %}
+{% block title %}Not Found · {{ fms_app_name }}{% endblock %}
+{% block auth_content %}
+  <div class="text-center">
+    <div class="empty-icon mx-auto mb-2">
+      <i class="bi bi-signpost-2"></i>
+    </div>
+    <h1 class="section-title">Page not found</h1>
+    <p class="text-secondary-fms text-small">The page you're looking for doesn't exist or may have moved.</p>
+    <a href="{% url 'core:dashboard' %}" class="btn btn-primary btn-sm">Back to Dashboard</a>
+  </div>
+{% endblock %}

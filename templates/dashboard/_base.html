@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{% block dashboard_title %}Dashboard{% endblock %} · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">{% endblock %}
+{% block content %}{% block dashboard_body %}{% endblock %}{% endblock %}
+{% block extra_js %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  {% include "dashboard/partials/_charts_js.html" %}
+  <script src="{% static 'js/dashboard.js' %}"></script>
+{% endblock %}

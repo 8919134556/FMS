@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ document.document_number }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'documents:document_list' %}">Documents</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <a href="{% url 'documents:document_detail' uuid=document.uuid %}">{{ document.document_number }}</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>Edit</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Edit {{ document.title }}</h1>
+      <p class="page-subtitle">Metadata only — use "Replace" on the document's detail page to upload a new file.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="file-earmark-text" title="Document" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.document_type.label }}</label>
+          {{ form.document_type }}
+        </div>
+        <div class="col-md-8">
+          <label class="form-label required-mark">{{ form.title.label }}</label>
+          {{ form.title }}
+          {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.issue_date.label }}</label>
+          {{ form.issue_date }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.expiry_date.label }}</label>
+          {{ form.expiry_date }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.notes.label }}</label>
+          {{ form.notes }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% url 'documents:document_detail' uuid=document.uuid %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="Saving Changes…">Save Changes</button>
+    </div>
+  </form>
+{% endblock %}

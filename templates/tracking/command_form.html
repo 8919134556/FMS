@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Send Command · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'tracking:command_list' %}">Commands</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>Send Command</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Send Command</h1>
+      <p class="page-subtitle">The command is queued and delivered next time the device is connected.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="terminal" title="Command" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.device.label }}</label>
+          {{ form.device }}
+          {% if form.device.errors %}<div class="invalid-feedback d-block">{{ form.device.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.command_type.label }}</label>
+          {{ form.command_type }}
+          {% if form.command_type.errors %}<div class="invalid-feedback d-block">{{ form.command_type.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.interval_seconds.label }}</label>
+          {{ form.interval_seconds }}
+          <div class="form-text">{{ form.interval_seconds.help_text }}</div>
+          {% if form.interval_seconds.errors %}<div class="invalid-feedback d-block">{{ form.interval_seconds.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.expires_at.label }}</label>
+          {{ form.expires_at }}
+          <div class="form-text">Optional — if the device hasn't connected by this time, the command expires unsent.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.custom_payload.label }}</label>
+          {{ form.custom_payload }}
+          <div class="form-text">{{ form.custom_payload.help_text }}</div>
+          {% if form.custom_payload.errors %}<div class="invalid-feedback d-block">{{ form.custom_payload.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+      <p class="text-small text-muted-fms mt-3 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Reporting Interval is used only for "Set Reporting Interval" commands; Payload (JSON) is used only for "Custom" commands.
+      </p>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% url 'tracking:command_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">Send Command</button>
+    </div>
+  </form>
+{% endblock %}

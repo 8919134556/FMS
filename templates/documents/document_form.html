@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Upload Document · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'documents:document_list' %}">Documents</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>Upload</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Upload Document</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" id="documentForm" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="file-earmark-text" title="Document" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.document_type.label }}</label>
+          {{ form.document_type }}
+        </div>
+        <div class="col-md-8">
+          <label class="form-label required-mark">{{ form.title.label }}</label>
+          {{ form.title }}
+          {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="cloud-upload" title="File" %}
+      <div class="upload-dropzone" id="uploadDropzone">
+        <div id="uploadDropzoneIdle">
+          <i class="bi bi-cloud-upload" style="font-size:2rem;"></i>
+          <p class="mb-1">Drop your document here or <span class="text-primary-fms" style="text-decoration:underline;cursor:pointer;">Browse Files</span></p>
+          <p class="text-small text-muted-fms mb-0">PDF &middot; DOC &middot; DOCX &middot; XLS &middot; XLSX &middot; CSV &middot; JPG &middot; PNG &middot; Maximum {{ max_upload_mb }} MB</p>
+        </div>
+        <div id="uploadDropzoneFile" class="d-none">
+          <div class="d-flex align-items-center gap-2 justify-content-center">
+            <i class="bi bi-file-earmark-check" style="font-size:1.5rem; color: var(--fms-success);"></i>
+            <div class="text-start">
+              <div id="uploadFileName" class="fw-semibold"></div>
+              <div id="uploadFileMeta" class="cell-secondary"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="uploadRemoveBtn">Remove</button>
+          </div>
+        </div>
+        {{ form.file }}
+      </div>
+      {% if form.file.errors %}<div class="invalid-feedback d-block">{{ form.file.errors|join:", " }}</div>{% endif %}
+      <div class="row g-3 mt-1">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.issue_date.label }}</label>
+          {{ form.issue_date }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.expiry_date.label }}</label>
+          {{ form.expiry_date }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="link-45deg" title="Relationship" %}
+      {% if locked_entity %}
+        <div class="alert alert-secondary d-flex align-items-center gap-2 mb-0">
+          <i class="bi bi-info-circle"></i>
+          <div>Attaching to <strong>{{ locked_entity.label }}: {{ locked_entity.object }}</strong></div>
+        </div>
+        {{ form.entity_type.as_hidden }}
+        {{ form.object_id.as_hidden }}
+      {% else %}
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label required-mark">{{ form.entity_type.label }}</label>
+            <select name="entity_type" id="entityTypeSelect" class="form-select">
+              <option value="">Select entity type…</option>
+              {% for value, label in form.fields.entity_type.choices %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Search</label>
+            <input type="search" id="relatedRecordSearch" class="form-control" placeholder="Search…" disabled>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label required-mark">Related Record</label>
+            <select id="relatedRecordSelect" name="object_id" class="form-select" disabled
+                    hx-get="{% url 'documents:document_related_options' %}"
+                    hx-trigger="change from:#entityTypeSelect, keyup changed delay:300ms from:#relatedRecordSearch"
+                    hx-target="#relatedRecordSelect"
+                    hx-include="#entityTypeSelect,#relatedRecordSearch">
+              <option value="">Select an entity type first…</option>
+            </select>
+            {% if form.object_id.errors %}<div class="invalid-feedback d-block">{{ form.object_id.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% url 'documents:document_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="Uploading…">Upload Document</button>
+    </div>
+  </form>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/document-form.js' %}"></script>
+{% endblock %}

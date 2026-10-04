@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Maintenance · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "maintenance" "create" as can_create %}
+  {% has_module_perm request.user "maintenance" "update" as can_update %}
+  {% has_module_perm request.user "maintenance" "archive" as can_cancel %}
+
+  <div class="breadcrumb-fms"><span>Fleet</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Maintenance</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Maintenance</h1>
+      <p class="page-subtitle">Monitor service schedules, overdue vehicles and maintenance costs.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Maintenance" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="Schedule Maintenance" can_create=can_create %}
+
+    {% if maintenance_records %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Maintenance</th>
+              <th>Vehicle</th>
+              <th>Type</th>
+              <th>Scheduled</th>
+              <th>Odometer</th>
+              <th>Priority</th>
+              <th>Cost</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in maintenance_records %}
+              <tr>
+                <td>
+                  <a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                      <i class="bi bi-tools"></i>
+                    </span>
+                    <span>
+                      <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ m.maintenance_number }}</div>
+                      <div class="cell-secondary">{{ m.description|default:m.get_maintenance_type_display|truncatechars:40 }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary"><a href="{% url 'vehicles:vehicle_detail' uuid=m.vehicle.uuid %}">{{ m.vehicle.registration_number }}</a>
+                  <div class="cell-secondary">{{ m.vehicle.make }} {{ m.vehicle.model }}</div></td>
+                <td class="cell-secondary">{{ m.get_maintenance_type_display }}</td>
+                <td class="cell-secondary">
+                  <div>{{ m.scheduled_date|date:"M d, Y" }}</div>
+                  {% if m.urgency == "OVERDUE" %}
+                    {% include "components/status_badge.html" with status="OVERDUE" label=m.overdue_label %}
+                  {% elif m.urgency == "DUE_TODAY" %}
+                    {% include "components/status_badge.html" with status="DUE_TODAY" label="Due Today" %}
+                  {% elif m.urgency == "DUE_SOON" %}
+                    {% include "components/status_badge.html" with status="DUE_SOON" label="Due Soon" %}
+                  {% endif %}
+                </td>
+                <td class="cell-secondary">{{ m.odometer_at_service }} {{ m.vehicle.odometer_unit }}</td>
+                <td>{% include "components/status_badge.html" with status=m.priority label=m.get_priority_display %}</td>
+                <td class="cell-secondary">{% if m.actual_cost is not None %}{{ m.actual_cost }}{% elif m.estimated_cost is not None %}~{{ m.estimated_cost }}{% else %}—{% endif %}</td>
+                <td>{% include "components/status_badge.html" with status=m.status label=m.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% if can_update and m.status in editable_statuses %}
+                        <li><a class="dropdown-item" href="{% url 'maintenance:maintenance_edit' uuid=m.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% if can_update %}
+                        {% if m.status == "SCHEDULED" %}
+                          <li><form method="post" action="{% url 'maintenance:maintenance_start' uuid=m.uuid %}">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-play-circle"></i>Start</button></form></li>
+                        {% elif m.status == "IN_PROGRESS" %}
+                          <li><a class="dropdown-item" href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}"><i class="bi bi-check-circle"></i>Complete</a></li>
+                        {% endif %}
+                      {% endif %}
+                      {% if can_cancel and m.status in cancellable_statuses %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}"><i class="bi bi-x-circle"></i>Cancel</a></li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.vehicle or current_filters.maintenance_type or current_filters.status or current_filters.priority or current_filters.service_center or current_filters.date_from or current_filters.date_to %}
+        {% include "components/empty_state.html" with icon="funnel" title="No maintenance records match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="tools" title="No maintenance records yet" message="Schedule your first service to start tracking vehicle maintenance." action_url=create_url action_label="Schedule Maintenance" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ route.name }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "route" "update" as can_update %}
+  {% has_module_perm request.user "route" "archive" as can_archive %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'routes:route_list' %}">Routes</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ route.name }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-signpost-split"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ route.name }}</h1>
+          {% include "components/status_badge.html" with status=route.status label=route.get_status_display %}
+        </div>
+        <p class="page-subtitle mb-0">
+          {{ route.code }}
+          {% if route.client %} &middot; <a href="{% url 'clients:client_detail' uuid=route.client.uuid %}">{{ route.client.client_name }}</a>{% else %} &middot; Any client{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_update %}
+        <a href="{% url 'routes:route_edit' uuid=route.uuid %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+      {% endif %}
+      {% if can_archive %}
+        {% if route.status == "ACTIVE" %}
+          <form method="post" action="{% url 'routes:route_deactivate' uuid=route.uuid %}" data-confirm="Deactivate {{ route.name }}?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-slash-circle me-1"></i>Deactivate</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'routes:route_activate' uuid=route.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Activate</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dashboard-kpi-grid mb-3">
+    {% include "components/kpi_card.html" with label="Stops" value=stops|length icon="geo-alt" tone="primary" %}
+    {% include "components/kpi_card.html" with label="Trips Using This Route" value=trip_count icon="signpost-split" tone="info" %}
+    {% include "components/kpi_card.html" with label="Est. Distance" value=route.estimated_distance_km|default:"—" icon="rulers" tone="purple" %}
+    {% include "components/kpi_card.html" with label="Est. Duration" value=route.estimated_duration_minutes|default:"—" icon="clock" tone="warning" %}
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Stops</span>
+        {% if stops %}
+          <div class="timeline mt-3">
+            {% for stop in stops %}
+              <div class="timeline-item">
+                <div class="fw-semibold"><span class="badge bg-secondary me-2">{{ stop.sequence }}</span><a href="{% url 'locations:site_detail' uuid=stop.site.uuid %}">{{ stop.site.site_name }}</a></div>
+                <div class="cell-secondary">{{ stop.site.address_line_1|default:"" }}{% if stop.site.city %}, {{ stop.site.city }}{% endif %}</div>
+                {% if stop.notes %}<div class="cell-secondary">{{ stop.notes }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="geo-alt" title="No stops defined" message="This route has no stops yet." %}
+        {% endif %}
+      </div>
+
+      {% if route.description %}
+        <div class="card-fms">
+          <span class="section-title" style="font-size:.95rem;">Description</span>
+          <p class="text-small mb-0 mt-2">{{ route.description }}</p>
+        </div>
+      {% endif %}
+    </div>
+    <div class="col-lg-5">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Trips Using This Route ({{ trip_count }})</span>
+        {% if trips %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Trip</th><th>Vehicle</th><th>Schedule</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for trip in trips %}
+                  <tr>
+                    <td><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}">{{ trip.trip_number }}</a></td>
+                    <td class="cell-secondary">{% if trip.vehicle %}{{ trip.vehicle.registration_number }}{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{{ trip.scheduled_start|date:"M d, H:i" }}</td>
+                    <td>{% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No trips yet" message="Trips assigned to this route will appear here." %}
+        {% endif %}
+      </div>
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

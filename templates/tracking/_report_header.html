@@ -1,0 +1,37 @@
+{% comment %}
+  Shared header for every page under Reports (Trip Report, Odometer Report, …):
+  title + "Updated …" line + auto-refresh interval + Refresh button. Driven by
+  FmsReportKit.createRefreshUi / FmsAutoRefresh using the element-id ``prefix``.
+
+  Params: prefix, title, icon, refresh_default (ms, as a string; default "30000").
+{% endcomment %}
+{% with selected=refresh_default|default:"30000" %}
+<div class="live-header">
+  <div class="live-header-title">
+    <span class="live-header-icon"><i class="bi bi-{{ icon }}"></i></span>
+    <div>
+      <h1 class="page-title mb-0">{{ title }}</h1>
+      <p class="page-subtitle mb-0 live-updated-line">
+        <span class="live-refresh-dot" id="{{ prefix }}RefreshDot" aria-hidden="true"></span>
+        <span id="{{ prefix }}LastUpdated" role="status" aria-live="polite">Not yet loaded</span>
+      </p>
+    </div>
+  </div>
+  <div class="live-header-actions">
+    <label class="live-interval-field" for="{{ prefix }}RefreshInterval">
+      <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+      <span class="live-interval-label">Auto refresh</span>
+      <select id="{{ prefix }}RefreshInterval" class="form-select form-select-sm">
+        <option value="5000"{% if selected == "5000" %} selected{% endif %}>5 seconds</option>
+        <option value="10000"{% if selected == "10000" %} selected{% endif %}>10 seconds</option>
+        <option value="30000"{% if selected == "30000" %} selected{% endif %}>30 seconds</option>
+        <option value="60000"{% if selected == "60000" %} selected{% endif %}>60 seconds</option>
+        <option value="300000"{% if selected == "300000" %} selected{% endif %}>5 minutes</option>
+      </select>
+    </label>
+    <button type="button" class="btn btn-primary btn-sm live-refresh-btn" id="{{ prefix }}RefreshBtn">
+      <i class="bi bi-arrow-clockwise me-1"></i><span>Refresh</span>
+    </button>
+  </div>
+</div>
+{% endwith %}

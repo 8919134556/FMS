@@ -1,0 +1,22 @@
+{% comment %}
+Usage: {% include "components/kpi_card.html" with label="Total Users" value=total_users icon="people" tone="primary" trend_direction="up" trend_value="+4.8%" trend_label="vs last month" %}
+Pass href="..." to make the whole card a clickable link (e.g. to a filtered list).
+Pass value_id="..." to give the value span an id — for a card a JS module updates in place
+(e.g. a live-refreshed summary strip) instead of always being server-rendered.
+{% endcomment %}
+<{% if href %}a href="{{ href }}"{% else %}div{% endif %} class="kpi-card{% if href %} kpi-card-link{% endif %}">
+  <div class="kpi-card-top">
+    <span class="kpi-label">{{ label }}</span>
+    <span class="kpi-icon" style="background: var(--fms-{{ tone|default:'primary' }}-soft); color: var(--fms-{{ tone|default:'primary' }});">
+      <i class="bi bi-{{ icon }}"></i>
+    </span>
+  </div>
+  <div class="kpi-value"{% if value_id %} id="{{ value_id }}"{% endif %}>{{ value }}</div>
+  {% if trend_value %}
+    <span class="kpi-trend {{ trend_direction }}">
+      <i class="bi bi-arrow-{% if trend_direction == 'up' %}up-right{% else %}down-right{% endif %}"></i>
+      {{ trend_value }}
+      {% if trend_label %}<span class="trend-label">{{ trend_label }}</span>{% endif %}
+    </span>
+  {% endif %}
+</{% if href %}a{% else %}div{% endif %}>

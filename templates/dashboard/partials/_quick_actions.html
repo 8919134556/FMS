@@ -1,0 +1,49 @@
+{% load fms_extras %}
+  {% comment %}============ Quick Actions ============{% endcomment %}
+  <div class="card-fms p-4 mt-4">
+    <span class="section-title" style="font-size:.95rem;">Quick Actions</span>
+    <div class="quick-actions-grid mt-3">
+      {% has_module_perm request.user "user" "create" as can_create_user %}
+      {% has_module_perm request.user "role" "create" as can_create_role %}
+      {% has_module_perm request.user "vehicle" "create" as can_create_vehicle %}
+      {% has_module_perm request.user "driver" "create" as can_create_driver %}
+      {% has_module_perm request.user "client" "create" as can_create_client %}
+      {% has_module_perm request.user "site" "create" as can_create_site %}
+      {% has_module_perm request.user "trip" "create" as can_create_trip %}
+      {% has_module_perm request.user "maintenance" "create" as can_create_maintenance %}
+      {% has_module_perm request.user "document" "create" as can_create_document %}
+      {% if can_view_tracking %}
+        <a href="{% url 'tracking:live_map' %}" class="quick-action-tile"><i class="bi bi-broadcast"></i>Live Tracking</a>
+      {% endif %}
+      {% if can_view_alert %}
+        <a href="{% url 'alerts:alert_list' %}" class="quick-action-tile"><i class="bi bi-bell"></i>View Alerts</a>
+      {% endif %}
+      {% if can_create_trip %}
+        <a href="{% url 'trips:trip_create' %}" class="quick-action-tile"><i class="bi bi-signpost-split"></i>Create Trip</a>
+      {% endif %}
+      {% if can_create_vehicle %}
+        <a href="{% url 'vehicles:vehicle_create' %}" class="quick-action-tile"><i class="bi bi-truck-front"></i>Add Vehicle</a>
+      {% endif %}
+      {% if can_create_driver %}
+        <a href="{% url 'drivers:driver_create' %}" class="quick-action-tile"><i class="bi bi-person-badge"></i>Add Driver</a>
+      {% endif %}
+      {% if can_create_client %}
+        <a href="{% url 'clients:client_create' %}" class="quick-action-tile"><i class="bi bi-building"></i>Add Client</a>
+      {% endif %}
+      {% if can_create_site %}
+        <a href="{% url 'locations:site_create' %}" class="quick-action-tile"><i class="bi bi-geo-alt"></i>Add Site</a>
+      {% endif %}
+      {% if can_create_maintenance %}
+        <a href="{% url 'maintenance:maintenance_create' %}" class="quick-action-tile"><i class="bi bi-tools"></i>Schedule Maintenance</a>
+      {% endif %}
+      {% if can_create_document %}
+        <a href="{% url 'documents:document_create' %}" class="quick-action-tile"><i class="bi bi-file-earmark-arrow-up"></i>Upload Document</a>
+      {% endif %}
+      {% if can_create_user %}
+        <a href="{% url 'accounts_portal:user_create' %}" class="quick-action-tile"><i class="bi bi-person-plus"></i>Add User</a>
+      {% endif %}
+      {% if can_create_role %}
+        <a href="{% url 'accounts_portal:role_create' %}" class="quick-action-tile"><i class="bi bi-shield-plus"></i>Add Role</a>
+      {% endif %}
+    </div>
+  </div>

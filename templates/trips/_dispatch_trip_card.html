@@ -1,0 +1,201 @@
+{% comment %}
+Usage: {% include "trips/_dispatch_trip_card.html" with trip=trip can_act=can_act %}
+Mirrors the status-conditional action chain in templates/trips/trip_detail.html,
+card-sized, with one modal instance per card (unique ids suffixed by trip.uuid
+since — unlike trip_detail.html — many cards render on one page).
+{% endcomment %}
+{% load fms_extras %}
+<div class="dispatch-trip-card">
+  <div class="dispatch-trip-card-top">
+    <a href="{% url 'trips:trip_detail' uuid=trip.uuid %}" class="dispatch-trip-number">{{ trip.trip_number }}</a>
+    {% include "components/status_badge.html" with status=trip.priority label=trip.get_priority_display %}
+  </div>
+  <div class="dispatch-trip-client">{{ trip.client.client_name }}</div>
+  <div class="dispatch-trip-route text-small text-muted-fms"><i class="bi bi-signpost-split me-1"></i>{{ trip.route_label }}</div>
+  <div class="dispatch-trip-meta text-small text-muted-fms"><i class="bi bi-clock me-1"></i>{{ trip.scheduled_start|date:"M d, H:i" }}</div>
+  <div class="dispatch-trip-resources">
+    <span class="dispatch-trip-resource{% if not trip.vehicle %} is-unassigned{% endif %}">
+      <i class="bi bi-truck-front"></i>{% if trip.vehicle %}{{ trip.vehicle.registration_number }}{% else %}Unassigned{% endif %}
+    </span>
+    <span class="dispatch-trip-resource{% if not trip.driver %} is-unassigned{% endif %}">
+      <i class="bi bi-person"></i>{% if trip.driver %}{{ trip.driver.get_full_name }}{% else %}Unassigned{% endif %}
+    </span>
+  </div>
+  <div class="dispatch-trip-card-bottom">
+    {% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}
+    {% if can_act %}
+      <div class="dispatch-trip-actions">
+        {% if trip.status == "SCHEDULED" %}
+          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#assignTripModal-{{ trip.uuid }}">Assign Resources</button>
+        {% elif trip.status == "ASSIGNED" %}
+          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#dispatchTripModal-{{ trip.uuid }}">Dispatch</button>
+        {% elif trip.status == "DISPATCHED" %}
+          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#startTripModal-{{ trip.uuid }}">Start</button>
+        {% elif trip.status == "IN_PROGRESS" %}
+          <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#delayTripModal-{{ trip.uuid }}">Delay</button>
+          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#completeTripModal-{{ trip.uuid }}">Complete</button>
+        {% elif trip.status == "DELAYED" %}
+          <form method="post" action="{% url 'trips:trip_resume' uuid=trip.uuid %}" class="d-inline">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Resume</button>
+          </form>
+          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#completeTripModal-{{ trip.uuid }}">Complete</button>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if can_act %}
+  {% if trip.status == "SCHEDULED" %}
+    <div class="modal fade" id="assignTripModal-{{ trip.uuid }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'trips:trip_assign' uuid=trip.uuid %}">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Assign Vehicle &amp; Driver — {{ trip.trip_number }}</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label required-mark">{{ trip.assign_form.vehicle.label }}</label>
+                {{ trip.assign_form.vehicle }}
+              </div>
+              <div class="mb-3">
+                <label class="form-label required-mark">{{ trip.assign_form.driver.label }}</label>
+                {{ trip.assign_form.driver }}
+              </div>
+              <p class="text-small text-muted-fms mb-0">
+                <i class="bi bi-info-circle me-1"></i>Availability, license validity, client match, and schedule conflicts are all checked before this assignment is confirmed.
+              </p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Assign</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% elif trip.status == "ASSIGNED" %}
+    <div class="modal fade" id="dispatchTripModal-{{ trip.uuid }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'trips:trip_dispatch' uuid=trip.uuid %}">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Dispatch {{ trip.trip_number }}</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between"><span class="cell-secondary">Route</span><span>{{ trip.route_label }}</span></div>
+                <div class="d-flex justify-content-between"><span class="cell-secondary">Vehicle</span><span>{{ trip.vehicle.registration_number }}</span></div>
+                <div class="d-flex justify-content-between"><span class="cell-secondary">Driver</span><span>{{ trip.driver.get_full_name }}</span></div>
+                <div class="d-flex justify-content-between"><span class="cell-secondary">Scheduled Start</span><span>{{ trip.scheduled_start|date:"M d, H:i" }}</span></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Dispatch Trip</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% elif trip.status == "DISPATCHED" %}
+    <div class="modal fade" id="startTripModal-{{ trip.uuid }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content">
+          <form method="post" action="{% url 'trips:trip_start' uuid=trip.uuid %}">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="modal-body pt-4 px-4 text-center">
+              <div class="empty-icon mx-auto mb-3" style="background: var(--fms-info-soft); color: var(--fms-info);"><i class="bi bi-play-circle"></i></div>
+              <h3 class="section-title mb-2">Start {{ trip.trip_number }}?</h3>
+              <p class="text-secondary-fms mb-0">This records the actual start time and moves the trip to In Progress.</p>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Start Trip</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% elif trip.status == "IN_PROGRESS" %}
+    <div class="modal fade" id="delayTripModal-{{ trip.uuid }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'trips:trip_delay' uuid=trip.uuid %}">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Mark {{ trip.trip_number }} as Delayed</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label required-mark">Delay Reason</label>
+                <select name="delay_reason" class="form-select">
+                  {% for value, label in trip.DelayReason.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Notes</label>
+                <textarea name="delay_notes" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-warning">Mark Delayed</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if trip.status == "IN_PROGRESS" or trip.status == "DELAYED" %}
+    <div class="modal fade" id="completeTripModal-{{ trip.uuid }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'trips:trip_complete' uuid=trip.uuid %}">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Complete {{ trip.trip_number }}</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label required-mark">Actual End Time</label>
+                <input type="datetime-local" name="actual_end" class="form-control" required>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Actual Distance (km)</label>
+                  <input type="number" step="0.01" name="actual_distance" class="form-control">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Fuel Used (litres)</label>
+                  <input type="number" step="0.01" name="fuel_used" class="form-control">
+                </div>
+              </div>
+              <div class="mt-3">
+                <label class="form-label">Driver Remarks</label>
+                <textarea name="driver_remarks" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="mt-3">
+                <label class="form-label">Notes</label>
+                <textarea name="completion_notes" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Complete Trip</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endif %}

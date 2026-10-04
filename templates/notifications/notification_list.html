@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Notifications · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms"><span>Notifications</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Notifications</h1>
+      <p class="page-subtitle">{{ unread_count }} unread notification{{ unread_count|pluralize }}.</p>
+    </div>
+    <div class="page-header-actions">
+      {% if unread_count %}
+        <form method="post" action="{% url 'notifications:notification_mark_all_read' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">Mark all read</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="btn-group mb-3" role="group" aria-label="Filter by status">
+    <a href="?" class="btn btn-sm {% if not current_status %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+    <a href="?status=unread" class="btn btn-sm {% if current_status == 'unread' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Unread</a>
+    <a href="?status=read" class="btn btn-sm {% if current_status == 'read' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Read</a>
+  </div>
+
+  <div class="table-card">
+    {% if notifications %}
+      <div class="d-flex flex-column">
+        {% for notification in notifications %}
+          <div class="notification-row{% if not notification.is_read %} is-unread{% endif %}">
+            <i class="bi bi-{% if notification.level == 'SUCCESS' %}check-circle{% elif notification.level == 'WARNING' %}exclamation-triangle{% elif notification.level == 'CRITICAL' %}exclamation-octagon{% else %}info-circle{% endif %} notification-row-icon notification-level-{{ notification.level|lower }}"></i>
+            <div class="flex-grow-1">
+              {% if notification.link_url %}
+                <a href="{{ notification.link_url }}" class="notification-row-title">{{ notification.title }}</a>
+              {% else %}
+                <span class="notification-row-title">{{ notification.title }}</span>
+              {% endif %}
+              {% if notification.body %}<p class="cell-secondary mb-1">{{ notification.body }}</p>{% endif %}
+              <span class="cell-secondary">{{ notification.created_at|date:"M d, Y H:i" }}</span>
+            </div>
+            <div class="d-flex gap-2">
+              {% if not notification.is_read %}
+                <form method="post" action="{% url 'notifications:notification_mark_read' uuid=notification.uuid %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">Mark read</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{% url 'notifications:notification_archive' uuid=notification.uuid %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Archive"><i class="bi bi-archive"></i></button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% include "components/empty_state.html" with icon="bell" title="No notifications" message="You're all caught up." %}
+    {% endif %}
+  </div>
+{% endblock %}

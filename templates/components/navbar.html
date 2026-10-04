@@ -1,0 +1,138 @@
+{% load fms_extras %}
+<header class="fms-topbar">
+  <button class="topbar-icon-btn d-xl-none" type="button" id="fmsMobileSidebarToggle" aria-label="Toggle navigation">
+    <i class="bi bi-list" style="font-size:1.2rem;"></i>
+  </button>
+
+  {% if request.user.is_authenticated %}
+    {# Phones: the current page name replaces the (hidden) breadcrumb so the bar still says where you are. #}
+    <span class="topbar-title d-md-none">{{ active_nav_label|default:fms_app_name }}</span>
+
+    <nav class="breadcrumb-fms d-none d-lg-flex mb-0" aria-label="Breadcrumb">
+      {% if active_nav_section and active_nav_section != active_nav_label %}
+        <span>{{ active_nav_section }}</span><i class="bi bi-chevron-right" style="font-size:9px;"></i>
+      {% endif %}
+      <span style="color: var(--fms-text-primary); font-weight: 600;">{{ active_nav_label|default:fms_app_name }}</span>
+    </nav>
+
+    <button type="button" class="global-search btn p-0 text-start" data-bs-toggle="modal" data-bs-target="#fmsCommandPalette" aria-label="Search">
+      <i class="bi bi-search"></i>
+      <span class="global-search-field d-block">Search users, employee IDs, emails&hellip;</span>
+      <kbd>Ctrl K</kbd>
+    </button>
+  {% else %}
+    <div class="flex-grow-1"></div>
+  {% endif %}
+
+  {% if request.user.is_authenticated %}
+    <div class="dropdown">
+      {% has_module_perm request.user "user" "create" as can_create_user %}
+      {% has_module_perm request.user "role" "create" as can_create_role %}
+      {% has_module_perm request.user "vehicle" "create" as can_create_vehicle %}
+      {% has_module_perm request.user "driver" "create" as can_create_driver %}
+      {% if can_create_user or can_create_role or can_create_vehicle or can_create_driver %}
+        <button class="btn btn-primary btn-sm dropdown-toggle quick-add-btn" type="button" data-bs-toggle="dropdown" aria-label="Quick add">
+          <i class="bi bi-plus-lg"></i><span class="quick-add-label">Quick Add</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          {% if can_create_vehicle %}<li><a class="dropdown-item" href="{% url 'vehicles:vehicle_create' %}"><i class="bi bi-truck-front me-2"></i>New Vehicle</a></li>{% endif %}
+          {% if can_create_driver %}<li><a class="dropdown-item" href="{% url 'drivers:driver_create' %}"><i class="bi bi-person-badge me-2"></i>New Driver</a></li>{% endif %}
+          {% if can_create_vehicle or can_create_driver %}<li><hr class="dropdown-divider"></li>{% endif %}
+          {% if can_create_user %}<li><a class="dropdown-item" href="{% url 'accounts_portal:user_create' %}"><i class="bi bi-person-plus me-2"></i>New User</a></li>{% endif %}
+          {% if can_create_role %}<li><a class="dropdown-item" href="{% url 'accounts_portal:role_create' %}"><i class="bi bi-shield-plus me-2"></i>New Role</a></li>{% endif %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="divider-v d-none d-lg-block" style="height:22px;"></div>
+
+    <div class="dropdown" id="fmsNotificationBell"
+         data-feed-url="{% url 'notifications:notification_feed' %}"
+         data-list-url="{% url 'notifications:notification_list' %}"
+         data-mark-read-url-template="{% url 'notifications:notification_mark_read' uuid='00000000-0000-0000-0000-000000000000' %}"
+         data-mark-all-read-url="{% url 'notifications:notification_mark_all_read' %}"
+         data-timezone="{{ fms_display_timezone }}">
+      <button class="topbar-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-label="Notifications">
+        <i class="bi bi-bell"></i>
+        <span class="notification-badge d-none" id="fmsNotificationBadge">0</span>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end notification-dropdown">
+        <div class="notification-dropdown-header">
+          <span class="section-title" style="font-size:.85rem;">Notifications</span>
+          <button type="button" class="btn btn-sm btn-link p-0" id="fmsMarkAllReadBtn">Mark all read</button>
+        </div>
+        <div id="fmsNotificationList" class="notification-dropdown-list">
+          <div class="text-small text-muted-fms text-center py-3">Loading…</div>
+        </div>
+        <div class="notification-dropdown-footer">
+          <a href="{% url 'notifications:notification_list' %}">View All Notifications</a>
+        </div>
+      </div>
+    </div>
+    <button class="topbar-icon-btn d-none d-lg-inline-flex" type="button" disabled title="Messaging is not part of this build">
+      <i class="bi bi-chat-dots"></i>
+    </button>
+    <button class="topbar-icon-btn d-none d-lg-inline-flex" type="button" id="fmsFullscreenToggle" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+      <i class="bi bi-arrows-fullscreen"></i>
+    </button>
+    <button class="topbar-icon-btn d-none d-sm-inline-flex" type="button" data-theme-quick-toggle aria-label="Switch theme">
+      <i class="bi bi-moon-stars"></i>
+    </button>
+
+    <div class="dropdown">
+      <button class="user-menu-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-label="Open profile menu">
+        <span class="avatar-chip-wrap">
+          <span class="avatar-chip">{{ request.user|initials }}</span>
+          <span class="online-dot" aria-hidden="true"></span>
+        </span>
+        <span class="user-meta d-none d-lg-block">
+          <div class="user-name">{{ request.user.get_short_name }}</div>
+          <div class="user-role">{{ request.user.role.name|default:"No role assigned" }}</div>
+        </span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end profile-menu">
+        <li class="profile-menu-header">
+          <span class="avatar-chip-wrap">
+            <span class="avatar-chip" style="width:40px;height:40px;font-size:.85rem;">{{ request.user|initials }}</span>
+            <span class="online-dot" aria-hidden="true"></span>
+          </span>
+          <span>
+            <div class="profile-menu-name">{{ request.user.get_full_name }}</div>
+            <div class="profile-menu-role">{{ request.user.role.name|default:"No role assigned" }}</div>
+          </span>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{% url 'accounts_portal:user_detail' uuid=request.user.uuid %}"><i class="bi bi-person"></i>My Profile</a></li>
+        {% has_module_perm request.user "user" "update" as can_update_self %}
+        {% if can_update_self %}
+          <li><a class="dropdown-item" href="{% url 'accounts_portal:user_edit' uuid=request.user.uuid %}"><i class="bi bi-gear"></i>Account Settings</a></li>
+        {% endif %}
+        <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}"><i class="bi bi-key"></i>Change Password</a></li>
+
+        <li class="dropdown-submenu-label"><i class="bi bi-palette"></i>Appearance</li>
+        <li class="appearance-options" role="radiogroup" aria-label="Theme">
+          <button type="button" class="appearance-option" data-theme-option="light" role="radio">
+            <i class="bi bi-sun"></i><span>Light</span><i class="bi bi-check2 check-icon"></i>
+          </button>
+          <button type="button" class="appearance-option" data-theme-option="dark" role="radio">
+            <i class="bi bi-moon-stars"></i><span>Dark</span><i class="bi bi-check2 check-icon"></i>
+          </button>
+          <button type="button" class="appearance-option" data-theme-option="system" role="radio">
+            <i class="bi bi-display"></i><span>System</span><i class="bi bi-check2 check-icon"></i>
+          </button>
+        </li>
+
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{% url 'notifications:notification_list' %}"><i class="bi bi-bell"></i>Notifications</a></li>
+        <li><span class="dropdown-item disabled"><i class="bi bi-question-circle"></i>Help &amp; Support</span></li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  {% endif %}
+</header>

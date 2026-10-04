@@ -1,0 +1,41 @@
+{% comment %}
+Data-driven filter bar. Usage:
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+Each entry in `fields`:
+  {"type": "search"|"select"|"date"|"time", "name": "q", "label": "Search", "value": "...",
+   "placeholder": "...", "choices": [(value, label), ...], "col": 4}
+{% endcomment %}
+<div class="filter-bar" data-filter-bar>
+  {# Phones: the fields collapse behind this toggle (opens itself when a filter is active). #}
+  <button type="button" class="filter-bar-toggle" data-filter-bar-toggle aria-expanded="false">
+    <span><i class="bi bi-funnel me-2"></i>Filters<span class="filter-bar-count" data-filter-bar-count hidden></span></span>
+    <i class="bi bi-chevron-down filter-bar-chevron"></i>
+  </button>
+  <form method="get" class="row g-2 align-items-end">
+    {% for field in fields %}
+      <div class="col-6 col-md-{{ field.col|default:3 }}{% if field.type != "select" and field.type != "date" and field.type != "time" %} filter-field-search{% endif %}">
+        <label class="form-label mb-1">{{ field.label }}</label>
+        {% if field.type == "select" %}
+          <select name="{{ field.name }}" class="form-select form-select-sm">
+            <option value="">{{ field.all_label|default:"All" }}</option>
+            {% for value, label in field.choices %}
+              <option value="{{ value }}" {% if field.value == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        {% elif field.type == "date" %}
+          <input type="date" name="{{ field.name }}" class="form-control form-control-sm" value="{{ field.value }}">
+        {% elif field.type == "time" %}
+          <input type="time" name="{{ field.name }}" class="form-control form-control-sm" value="{{ field.value }}">
+        {% else %}
+          <input type="search" name="{{ field.name }}" class="form-control form-control-sm" placeholder="{{ field.placeholder }}" value="{{ field.value }}">
+        {% endif %}
+      </div>
+    {% endfor %}
+    <div class="col-6 col-md-2 d-flex gap-2">
+      <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+        <i class="bi bi-funnel me-1"></i>Filter
+      </button>
+      <a href="{{ reset_url }}" class="btn btn-sm btn-outline-secondary" title="Reset filters"><i class="bi bi-x-lg"></i></a>
+    </div>
+  </form>
+</div>

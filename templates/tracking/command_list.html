@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Device Commands · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'tracking:device_list' %}">Tracking</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>Commands</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Device Commands</h1>
+      <p class="page-subtitle">Send and track commands delivered to GPS devices.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Commands" count=page_obj.paginator.count create_url=create_url create_label="Send Command" can_create=can_command %}
+
+    {% if commands %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Device</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Sent</th>
+              <th>Retries</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for command in commands %}
+              <tr>
+                <td><a href="{% url 'tracking:device_detail' uuid=command.device.uuid %}">{{ command.device.imei }}</a></td>
+                <td class="cell-secondary">{{ command.get_command_type_display }}</td>
+                <td>{% include "components/status_badge.html" with status=command.status label=command.get_status_display %}</td>
+                <td class="cell-secondary">{{ command.created_at|date:"M d, H:i" }}</td>
+                <td class="cell-secondary">{{ command.sent_at|date:"M d, H:i"|default:"—" }}</td>
+                <td class="cell-secondary">{{ command.retry_count }}/{{ command.max_retries }}</td>
+                <td class="text-end">
+                  <a href="{% url 'tracking:command_detail' uuid=command.uuid %}" class="btn btn-sm btn-outline-secondary">View</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if request.GET.q or request.GET.status or request.GET.command_type %}
+        {% include "components/empty_state.html" with icon="funnel" title="No commands match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="terminal" title="No commands sent yet." message="Send a command to a GPS device to see its delivery status here." action_url=create_url action_label="Send Command" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

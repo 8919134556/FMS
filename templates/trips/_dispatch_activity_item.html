@@ -1,0 +1,11 @@
+{% comment %}Usage: {% include "trips/_dispatch_activity_item.html" with log=log %}{% endcomment %}
+{% load fms_extras %}
+<div class="timeline-item">
+  <div class="d-flex align-items-start gap-2">
+    <i class="bi bi-{{ log.action|action_icon }}"></i>
+    <div>
+      <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+      <div class="cell-secondary">{{ log.timestamp|date:"M d, H:i" }}</div>
+    </div>
+  </div>
+</div>

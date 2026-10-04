@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ client.client_name }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "client" "update" as can_update %}
+  {% has_module_perm request.user "client" "archive" as can_archive %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'clients:client_list' %}">Clients</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ client.client_name }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-building"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ client.client_name }}</h1>
+          {% include "components/status_badge.html" with status=client.status label=client.get_status_display %}
+        </div>
+        <p class="page-subtitle mb-0">
+          {{ client.client_code }} &middot; {{ client.get_client_type_display }}
+          {% if client.phone %} &middot; {{ client.phone }}{% endif %}
+          {% if client.email %} &middot; {{ client.email }}{% endif %}
+          {% if client.account_manager %} &middot; Managed by {{ client.account_manager.get_full_name }}{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_update %}
+        <a href="{% url 'clients:client_edit' uuid=client.uuid %}" class="btn btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+      {% endif %}
+      {% if can_archive %}
+        {% if client.status == "ACTIVE" %}
+          <form method="post" action="{% url 'clients:client_deactivate' uuid=client.uuid %}" data-confirm="Deactivate {{ client.client_name }}?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-slash-circle me-1"></i>Deactivate</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'clients:client_activate' uuid=client.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Activate</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% include "components/tabs.html" with tabs=tab_list active=active_tab %}
+
+  <div class="mt-3">
+    {% if active_tab == "vehicles" %}
+      <div class="card-fms">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="section-title" style="font-size:.95rem;">Vehicles ({{ vehicle_count }})</span>
+          {% has_module_perm request.user "vehicle" "create" as can_add_vehicle %}
+          {% if can_add_vehicle %}<a href="{% url 'vehicles:vehicle_create' %}?client={{ client.id }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Vehicle</a>{% endif %}
+        </div>
+        {% if vehicles %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Vehicle</th><th>Type</th><th>Driver</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for vehicle in vehicles %}
+                  <tr>
+                    <td><a href="{% url 'vehicles:vehicle_detail' uuid=vehicle.uuid %}">{{ vehicle.registration_number }}</a>
+                      <div class="cell-secondary">{{ vehicle.make }} {{ vehicle.model }}</div></td>
+                    <td class="cell-secondary">{{ vehicle.vehicle_type.name|default:"—" }}</td>
+                    <td class="cell-secondary">{% if vehicle.current_driver %}<a href="{% url 'drivers:driver_detail' uuid=vehicle.current_driver.uuid %}">{{ vehicle.current_driver.get_full_name }}</a>{% else %}—{% endif %}</td>
+                    <td>{% include "components/status_badge.html" with status=vehicle.status label=vehicle.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="truck-front" title="No vehicles allocated" message="Vehicles assigned to this client will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "drivers" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Drivers ({{ driver_count }})</span>
+        {% if drivers %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Driver</th><th>Mobile</th><th>License</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for driver in drivers %}
+                  <tr>
+                    <td><a href="{% url 'drivers:driver_detail' uuid=driver.uuid %}">{{ driver.get_full_name }}</a>
+                      <div class="cell-secondary">{{ driver.employee_id }}</div></td>
+                    <td class="cell-secondary">{{ driver.mobile_number }}</td>
+                    <td class="cell-secondary">{{ driver.license_number }}</td>
+                    <td>{% include "components/status_badge.html" with status=driver.employment_status label=driver.get_employment_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="person-badge" title="No drivers allocated" message="Drivers assigned to this client will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "trips" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Trips ({{ trip_count }})</span>
+        {% if trips %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Trip</th><th>Route</th><th>Vehicle</th><th>Driver</th><th>Schedule</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for trip in trips %}
+                  <tr>
+                    <td><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}">{{ trip.trip_number }}</a></td>
+                    <td class="cell-secondary">{{ trip.route_label }}</td>
+                    <td class="cell-secondary">{% if trip.vehicle %}<a href="{% url 'vehicles:vehicle_detail' uuid=trip.vehicle.uuid %}">{{ trip.vehicle.registration_number }}</a>{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{% if trip.driver %}<a href="{% url 'drivers:driver_detail' uuid=trip.driver.uuid %}">{{ trip.driver.get_full_name }}</a>{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{{ trip.scheduled_start|date:"M d, H:i" }}</td>
+                    <td>{% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No trips for this client" message="Trips created for this client will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "branches" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Branches ({{ branch_count }})</span>
+        {% if branches %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Branch</th><th>Type</th><th>City</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for branch in branches %}
+                  <tr>
+                    <td><a href="{% url 'locations:branch_detail' uuid=branch.uuid %}">{{ branch.name }}</a><div class="cell-secondary">{{ branch.code }}</div></td>
+                    <td class="cell-secondary">{{ branch.get_branch_type_display }}</td>
+                    <td class="cell-secondary">{{ branch.city|default:"—" }}</td>
+                    <td>{% include "components/status_badge.html" with status=branch.status label=branch.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="diagram-3" title="No branches yet" message="Branches / depots linked to this client will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "contracts" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Contracts ({{ contracts|length }})</span>
+        {% if contracts %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Contract #</th><th>Type</th><th>Start</th><th>End</th><th>Value</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for contract in contracts %}
+                  <tr>
+                    <td><a href="{% url 'contracts:contract_detail' uuid=contract.uuid %}">{{ contract.contract_number }}</a></td>
+                    <td class="cell-secondary">{{ contract.get_contract_type_display }}</td>
+                    <td class="cell-secondary">{{ contract.start_date|default:"—" }}</td>
+                    <td class="cell-secondary">{{ contract.end_date|default:"—" }}</td>
+                    <td class="cell-secondary">{{ contract.contract_value|default:"—" }}</td>
+                    <td>{% include "components/status_badge.html" with status=contract.status label=contract.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="file-earmark-text" title="No contracts yet" message="Contracts linked to this client will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "sites" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Sites ({{ site_count }})</span>
+        {% if sites %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Site</th><th>Type</th><th>Branch</th><th>Contact</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for site in sites %}
+                  <tr>
+                    <td><a href="{% url 'locations:site_detail' uuid=site.uuid %}">{{ site.site_name }}</a>
+                      <div class="cell-secondary">{{ site.site_code }}{% if site.city %} &middot; {{ site.city }}{% endif %}</div></td>
+                    <td class="cell-secondary">{{ site.get_site_type_display }}</td>
+                    <td class="cell-secondary">{{ site.branch.name|default:"—" }}</td>
+                    <td class="cell-secondary">{{ site.contact_name|default:"—" }}</td>
+                    <td>{% include "components/status_badge.html" with status=site.status label=site.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="geo-alt" title="No sites yet" message="Pickup/delivery locations for this client will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "documents" %}
+      {% include "components/document_tab.html" with documents=documents entity_type="client" object_id=client.id %}
+
+    {% elif active_tab == "history" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+
+    {% else %}
+      {% has_module_perm request.user "vehicle" "view" as can_see_vehicles %}
+      {% has_module_perm request.user "driver" "view" as can_see_drivers %}
+      {% has_module_perm request.user "branch" "view" as can_see_branches %}
+      {% has_module_perm request.user "contract" "view" as can_see_contracts %}
+      {% has_module_perm request.user "site" "view" as can_see_sites %}
+      {% has_module_perm request.user "trip" "view" as can_see_trips %}
+      {% has_module_perm request.user "document" "view" as can_see_documents %}
+      <div class="dashboard-kpi-grid mb-3">
+        {% if can_see_vehicles %}{% include "components/kpi_card.html" with label="Vehicles" value=vehicle_count icon="truck-front" tone="primary" %}{% endif %}
+        {% if can_see_drivers %}{% include "components/kpi_card.html" with label="Drivers" value=driver_count icon="person-badge" tone="info" %}{% endif %}
+        {% if can_see_branches %}{% include "components/kpi_card.html" with label="Branches" value=branch_count icon="diagram-3" tone="purple" %}{% endif %}
+        {% if can_see_contracts %}{% include "components/kpi_card.html" with label="Active Contracts" value=active_contract_count icon="file-earmark-text" tone="success" %}{% endif %}
+        {% if can_see_sites %}{% include "components/kpi_card.html" with label="Sites" value=site_count icon="geo-alt" tone="warning" %}{% endif %}
+        {% if can_see_trips %}
+          {% include "components/kpi_card.html" with label="Total Trips" value=trip_count icon="signpost-split" tone="primary" %}
+          {% include "components/kpi_card.html" with label="Active Trips" value=active_trip_count icon="send" tone="info" %}
+          {% include "components/kpi_card.html" with label="Completed Trips" value=completed_trip_count icon="check-circle" tone="success" %}
+        {% endif %}
+      </div>
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="card-fms mb-3">
+            <span class="section-title" style="font-size:.95rem;">Client Information</span>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4"><div class="cell-secondary">Legal Name</div><div>{{ client.legal_name|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Industry</div><div>{{ client.industry|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Type</div><div>{{ client.get_client_type_display }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Email</div><div>{{ client.email|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Phone</div><div>{{ client.phone|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Account Manager</div><div>{{ client.account_manager.get_full_name|default:"—" }}</div></div>
+              <div class="col-md-8"><div class="cell-secondary">Address</div><div>{{ client.address_line_1|default:"—" }}{% if client.city %}, {{ client.city }}{% endif %}{% if client.state %}, {{ client.state }}{% endif %}</div></div>
+            </div>
+          </div>
+          {% if client.notes %}
+            <div class="card-fms">
+              <span class="section-title" style="font-size:.95rem;">Notes</span>
+              <p class="text-small mb-0 mt-2">{{ client.notes }}</p>
+            </div>
+          {% endif %}
+        </div>
+        <div class="col-lg-4">
+          <div class="card-fms">
+            <span class="section-title" style="font-size:.95rem;">Quick Links</span>
+            <div class="d-flex flex-column gap-2 mt-2">
+              {% if can_see_trips %}<a href="{% url 'clients:client_detail' uuid=client.uuid %}?tab=trips" class="btn btn-sm btn-outline-secondary text-start"><i class="bi bi-signpost-split me-1"></i>View Trips</a>{% endif %}
+              {% if can_see_vehicles %}<a href="{% url 'clients:client_detail' uuid=client.uuid %}?tab=vehicles" class="btn btn-sm btn-outline-secondary text-start"><i class="bi bi-truck-front me-1"></i>View Vehicles</a>{% endif %}
+              {% if can_see_drivers %}<a href="{% url 'clients:client_detail' uuid=client.uuid %}?tab=drivers" class="btn btn-sm btn-outline-secondary text-start"><i class="bi bi-person-badge me-1"></i>View Drivers</a>{% endif %}
+              {% if can_see_contracts %}<a href="{% url 'clients:client_detail' uuid=client.uuid %}?tab=contracts" class="btn btn-sm btn-outline-secondary text-start"><i class="bi bi-file-earmark-text me-1"></i>View Contracts</a>{% endif %}
+              {% if can_see_sites %}<a href="{% url 'clients:client_detail' uuid=client.uuid %}?tab=sites" class="btn btn-sm btn-outline-secondary text-start"><i class="bi bi-geo-alt me-1"></i>View Sites</a>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

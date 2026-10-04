@@ -1,0 +1,11 @@
+{% if messages %}
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: var(--fms-z-toast);">
+    {% for message in messages %}
+      {% if message.tags == "danger" %}{% with icon="x-circle-fill" tone="danger" %}{% include "components/_toast_item.html" %}{% endwith %}
+      {% elif message.tags == "warning" %}{% with icon="exclamation-triangle-fill" tone="warning" %}{% include "components/_toast_item.html" %}{% endwith %}
+      {% elif message.tags == "success" %}{% with icon="check-circle-fill" tone="success" %}{% include "components/_toast_item.html" %}{% endwith %}
+      {% else %}{% with icon="info-circle-fill" tone="info" %}{% include "components/_toast_item.html" %}{% endwith %}
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endif %}

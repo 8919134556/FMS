@@ -1,0 +1,11 @@
+{% comment %}
+Usage: {% include "components/tabs.html" with tabs=tab_list active=current_tab %}
+tab_list = [{"id": "overview", "label": "Overview", "icon": "info-circle", "url": "..."}]
+{% endcomment %}
+<div class="tabs-fms">
+  {% for tab in tabs %}
+    <a href="{{ tab.url }}" class="tab-link {% if tab.id == active %}active{% endif %}">
+      {% if tab.icon %}<i class="bi bi-{{ tab.icon }} me-1"></i>{% endif %}{{ tab.label }}
+    </a>
+  {% endfor %}
+</div>

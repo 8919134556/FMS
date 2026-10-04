@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Odometer Report · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}
+  {# Same stylesheets as the Trip Report — one look for every page under Reports. #}
+  <link rel="stylesheet" href="{% static 'css/live_tracking.css' %}">
+  <link rel="stylesheet" href="{% static 'css/trip_report.css' %}">
+{% endblock %}
+{% block content %}
+  {# No odometer data is rendered server-side — the JS fetches the aggregated rows from the RBAC'd API. #}
+  <div id="odometerReportRoot"
+       data-report-url="{% url 'odometer-report-data' %}"
+       data-export-url="{% url 'odometer-report-export' %}"
+       data-max-custom-days="{{ max_custom_range_days }}">
+
+    <div class="breadcrumb-fms"><span>Reports</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Odometer Report</span></div>
+
+    {% include "tracking/_report_header.html" with prefix="odo" title="Odometer Report" icon="speedometer" refresh_default="300000" %}
+
+    <p class="text-small text-muted-fms trip-report-note">
+      <i class="bi bi-info-circle me-1"></i><span>Daily comparison of two independent readings:
+      <strong class="odo-legend is-device">Device Odometer</strong> — the vehicle's own odometer, and
+      <strong class="odo-legend is-gps">GPS Odometer</strong> — distance calculated from GPS latitude/longitude.</span>
+    </p>
+
+    {% include "tracking/_report_range_bar.html" with prefix="odo" pdf_hint="Summary, daily comparison chart & tables" xlsx_hint="Daily odometer, vehicle & daily totals sheets" %}
+
+    {% include "tracking/_report_filters.html" with prefix="odo" search_placeholder="Search registration, driver…" search_label="Search vehicles" pills_label="Filter by data status" error_noun="odometer data" %}
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <div class="table-card-title">
+          <span class="section-title">Daily Odometer</span>
+          <span class="text-small text-muted-fms ms-2" id="odoTableCount">Loading…</span>
+        </div>
+      </div>
+
+      <div class="table-responsive-fms">
+        {# One header row (the responsive card view labels cells from it); groups are marked by colour. #}
+        <table class="table odo-table" id="odometerReportTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Vehicle / Driver</th>
+              <th class="odo-th is-device"><span class="odo-th-group">Device Odometer</span> Start</th>
+              <th class="odo-th is-device"><span class="odo-th-group">Device Odometer</span> End</th>
+              <th class="odo-th is-device"><span class="odo-th-group">Device Odometer</span> Distance</th>
+              <th class="odo-th is-gps"><span class="odo-th-group">GPS Odometer</span> Start</th>
+              <th class="odo-th is-gps"><span class="odo-th-group">GPS Odometer</span> End</th>
+              <th class="odo-th is-gps"><span class="odo-th-group">GPS Odometer</span> Distance</th>
+              <th>Difference</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="odometerReportTableBody">
+            {% include "components/loading.html" with rows=6 cols=10 %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-none" id="odometerReportEmpty">
+        {% include "components/empty_state.html" with icon="speedometer" title="Nothing to show" message="No GPS-tracked vehicles match the current filters." %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'js/auto_refresh.js' %}"></script>
+  <script src="{% static 'js/fms_format.js' %}"></script>
+  <script src="{% static 'js/report_common.js' %}"></script>
+  <script src="{% static 'js/odometer_report.js' %}"></script>
+{% endblock %}

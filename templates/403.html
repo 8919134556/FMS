@@ -1,0 +1,12 @@
+{% extends "base_auth.html" %}
+{% block title %}Access Denied · {{ fms_app_name }}{% endblock %}
+{% block auth_content %}
+  <div class="text-center">
+    <div class="empty-icon mx-auto mb-2" style="background: var(--fms-danger-soft); color: var(--fms-danger);">
+      <i class="bi bi-shield-exclamation"></i>
+    </div>
+    <h1 class="section-title">Access denied</h1>
+    <p class="text-secondary-fms text-small">You don't have permission to perform this action. Contact your administrator if you believe this is a mistake.</p>
+    <a href="{% url 'core:dashboard' %}" class="btn btn-primary btn-sm">Back to Dashboard</a>
+  </div>
+{% endblock %}

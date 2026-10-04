@@ -1,0 +1,49 @@
+{% load fms_extras %}
+  {% comment %}============ Section 7: Maintenance Overview ============{% endcomment %}
+  {% if can_view_maintenance %}
+    <div class="table-card mt-4">
+      <div class="table-card-header">
+        <span class="section-title">Maintenance Overview</span>
+        <a href="/maintenance/" class="btn btn-sm btn-outline-secondary">View All Maintenance</a>
+      </div>
+      {% if maintenance_overview_error %}
+        <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load maintenance data.</div>
+      {% elif maintenance_overview.overdue or maintenance_overview.due_today or maintenance_overview.due_soon or maintenance_overview.in_progress %}
+        <div class="p-3 pt-0">
+          <div class="today-ops-grid mb-3">
+            {% include "components/kpi_card.html" with label="Overdue" value=maintenance_overview.overdue icon="exclamation-triangle" tone="danger" href="/maintenance/?status=OVERDUE" %}
+            {% include "components/kpi_card.html" with label="Due Today" value=maintenance_overview.due_today icon="calendar-event" tone="warning" %}
+            {% include "components/kpi_card.html" with label="Due Soon" value=maintenance_overview.due_soon icon="hourglass-split" tone="info" %}
+            {% include "components/kpi_card.html" with label="In Progress" value=maintenance_overview.in_progress icon="tools" tone="info" href="/maintenance/?status=IN_PROGRESS" %}
+          </div>
+        </div>
+        {% if maintenance_overview.table_rows %}
+          <div class="table-responsive-fms">
+            <table class="table">
+              <thead><tr><th>Vehicle</th><th>Service</th><th>Due Date</th><th>Priority</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+              <tbody>
+                {% for m in maintenance_overview.table_rows %}
+                  <tr>
+                    <td><a href="{% url 'vehicles:vehicle_detail' uuid=m.vehicle.uuid %}">{{ m.vehicle.registration_number }}</a></td>
+                    <td class="cell-secondary">{{ m.get_maintenance_type_display }}</td>
+                    <td class="cell-secondary">
+                      {{ m.scheduled_date }}
+                      {% if m.urgency == "OVERDUE" %}{% include "components/status_badge.html" with status="OVERDUE" label=m.overdue_label %}{% endif %}
+                    </td>
+                    <td>{% include "components/status_badge.html" with status=m.priority label=m.get_priority_display %}</td>
+                    <td>{% include "components/status_badge.html" with status=m.status label=m.get_status_display %}</td>
+                    <td class="text-end">
+                      <a href="{% url 'vehicles:vehicle_detail' uuid=m.vehicle.uuid %}" class="btn btn-sm btn-outline-secondary">View Vehicle</a>
+                      <a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}" class="btn btn-sm btn-outline-secondary">View</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="check-lg" title="No maintenance issues require attention" message="Your fleet is currently up to date." %}
+      {% endif %}
+    </div>
+  {% endif %}

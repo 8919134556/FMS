@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Vehicle-Driver Assignments · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms"><span>Fleet</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Assignments</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Assignments</h1>
+      <p class="page-subtitle">Full history of vehicle-driver assignments across the fleet.</p>
+    </div>
+  </div>
+
+  <p class="text-small text-muted-fms mb-3">
+    <i class="bi bi-info-circle me-1"></i>To assign or unassign a driver, open the vehicle's own detail page — this is a read-only registry of every assignment ever recorded.
+  </p>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Assignments" count=page_obj.paginator.count %}
+
+    {% if assignments %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Driver</th>
+              <th>Type</th>
+              <th>Primary</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for assignment in assignments %}
+              <tr>
+                <td><a href="{% url 'vehicles:vehicle_detail' uuid=assignment.vehicle.uuid %}">{{ assignment.vehicle.registration_number }}</a></td>
+                <td><a href="{% url 'drivers:driver_detail' uuid=assignment.driver.uuid %}">{{ assignment.driver.get_full_name }}</a></td>
+                <td class="cell-secondary">{{ assignment.get_assignment_type_display }}</td>
+                <td class="cell-secondary">{{ assignment.primary_driver|yesno:"Yes,No" }}</td>
+                <td class="cell-secondary">{{ assignment.start_date }}</td>
+                <td class="cell-secondary">{{ assignment.end_date|default:"—" }}</td>
+                <td>{% include "components/status_badge.html" with status=assignment.status label=assignment.get_status_display %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.status or current_filters.assignment_type %}
+        {% include "components/empty_state.html" with icon="funnel" title="No assignments match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="link-45deg" title="No assignments yet" message="Assign a driver to a vehicle from the vehicle's detail page to see it here." %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

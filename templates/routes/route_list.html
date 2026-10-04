@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Routes · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "route" "create" as can_create %}
+
+  <div class="breadcrumb-fms"><span>Operations</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Routes</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Routes</h1>
+      <p class="page-subtitle">Reusable multi-stop itineraries trips can optionally follow.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Routes" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="Add Route" can_create=can_create %}
+
+    {% if routes %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Route</th>
+              <th>Client</th>
+              <th>Stops</th>
+              <th>Est. Distance</th>
+              <th>Est. Duration</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for route in routes %}
+              <tr>
+                <td>
+                  <a href="{% url 'routes:route_detail' uuid=route.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                      <i class="bi bi-signpost-split"></i>
+                    </span>
+                    <span>
+                      <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ route.name }}</div>
+                      <div class="cell-secondary">{{ route.code }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">{% if route.client %}<a href="{% url 'clients:client_detail' uuid=route.client.uuid %}">{{ route.client.client_name }}</a>{% else %}Any client{% endif %}</td>
+                <td class="cell-secondary">{{ route.stop_count_annotated }}</td>
+                <td class="cell-secondary">{{ route.estimated_distance_km|default:"—" }}{% if route.estimated_distance_km %} km{% endif %}</td>
+                <td class="cell-secondary">{{ route.estimated_duration_minutes|default:"—" }}{% if route.estimated_duration_minutes %} min{% endif %}</td>
+                <td>{% include "components/status_badge.html" with status=route.status label=route.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'routes:route_detail' uuid=route.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% has_module_perm request.user "route" "update" as can_update %}
+                      {% if can_update %}
+                        <li><a class="dropdown-item" href="{% url 'routes:route_edit' uuid=route.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% has_module_perm request.user "route" "archive" as can_archive %}
+                      {% if can_archive %}
+                        <li><hr class="dropdown-divider"></li>
+                        {% if route.status == "ACTIVE" %}
+                          <li>
+                            <form method="post" action="{% url 'routes:route_deactivate' uuid=route.uuid %}" data-confirm="Deactivate {{ route.name }}?">
+                              {% csrf_token %}<button type="submit" class="dropdown-item text-danger"><i class="bi bi-slash-circle"></i>Deactivate</button>
+                            </form>
+                          </li>
+                        {% else %}
+                          <li>
+                            <form method="post" action="{% url 'routes:route_activate' uuid=route.uuid %}">
+                              {% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-check-circle"></i>Activate</button>
+                            </form>
+                          </li>
+                        {% endif %}
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.status or current_filters.client %}
+        {% include "components/empty_state.html" with icon="funnel" title="No routes match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="signpost-split" title="No routes yet" message="Add a route to organize repeat multi-stop trips." action_url=create_url action_label="Add Route" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

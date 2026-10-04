@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Vehicles · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "vehicle" "create" as can_create %}
+
+  <div class="breadcrumb-fms"><span>Fleet</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Vehicles</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Vehicles</h1>
+      <p class="page-subtitle">Manage fleet vehicles, assignments, documents and operational status.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Vehicles" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="Add Vehicle" can_create=can_create %}
+
+    {% if vehicles %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Type</th>
+              <th>Client</th>
+              <th>Driver</th>
+              <th>GPS</th>
+              <th>Odometer</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for vehicle in vehicles %}
+              <tr>
+                <td>
+                  <a href="{% url 'vehicles:vehicle_detail' uuid=vehicle.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                      <i class="bi bi-truck-front"></i>
+                    </span>
+                    <span>
+                      <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ vehicle.registration_number }}</div>
+                      <div class="cell-secondary">{{ vehicle.make }} {{ vehicle.model }} &middot; {{ vehicle.vehicle_code }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">{{ vehicle.vehicle_type.name|default:"—" }}</td>
+                <td class="cell-secondary">{{ vehicle.client.client_name|default:"—" }}</td>
+                <td class="cell-secondary">
+                  {% if vehicle.current_driver %}
+                    <a href="{% url 'drivers:driver_detail' uuid=vehicle.current_driver.uuid %}">{{ vehicle.current_driver.get_full_name }}</a>
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if vehicle.tracking_device.status == "ACTIVE" %}
+                    {% include "components/status_badge.html" with status="ACTIVE" label="Online" %}
+                  {% elif vehicle.tracking_device %}
+                    {% include "components/status_badge.html" with status="INACTIVE" label="Offline" %}
+                  {% else %}
+                    <span class="status-pill tone-neutral"><span class="dot"></span>No Device</span>
+                  {% endif %}
+                </td>
+                <td class="cell-secondary">{{ vehicle.odometer_reading }} {{ vehicle.odometer_unit }}</td>
+                <td>{% include "components/status_badge.html" with status=vehicle.status label=vehicle.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'vehicles:vehicle_detail' uuid=vehicle.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% has_module_perm request.user "vehicle" "update" as can_update %}
+                      {% if can_update %}
+                        <li><a class="dropdown-item" href="{% url 'vehicles:vehicle_edit' uuid=vehicle.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% has_module_perm request.user "assignment" "create" as can_assign %}
+                      {% if can_assign %}
+                        <li><a class="dropdown-item" href="{% url 'vehicles:vehicle_detail' uuid=vehicle.uuid %}?tab=driver"><i class="bi bi-person-check"></i>Assign Driver</a></li>
+                      {% endif %}
+                      {% has_module_perm request.user "maintenance" "create" as can_create_maintenance %}
+                      {% if can_create_maintenance %}
+                        <li><a class="dropdown-item" href="{% url 'maintenance:maintenance_create' %}?vehicle={{ vehicle.id }}"><i class="bi bi-tools"></i>Add Maintenance</a></li>
+                      {% endif %}
+                      <li><span class="dropdown-item disabled" title="Available once Documents ships"><i class="bi bi-file-earmark-arrow-up"></i>Add Document</span></li>
+                      {% has_module_perm request.user "vehicle" "archive" as can_archive %}
+                      {% if can_archive %}
+                        <li><hr class="dropdown-divider"></li>
+                        {% if vehicle.status == "ACTIVE" %}
+                          <li>
+                            <form method="post" action="{% url 'vehicles:vehicle_deactivate' uuid=vehicle.uuid %}" data-confirm="Deactivate {{ vehicle.registration_number }}?">
+                              {% csrf_token %}<button type="submit" class="dropdown-item text-danger"><i class="bi bi-slash-circle"></i>Deactivate</button>
+                            </form>
+                          </li>
+                        {% else %}
+                          <li>
+                            <form method="post" action="{% url 'vehicles:vehicle_activate' uuid=vehicle.uuid %}">
+                              {% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-check-circle"></i>Activate</button>
+                            </form>
+                          </li>
+                        {% endif %}
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% include "components/empty_state.html" with icon="truck-front" title="No vehicles found" message="Try adjusting your filters, or add your first vehicle." action_url=create_url action_label="Add Vehicle" %}
+    {% endif %}
+  </div>
+{% endblock %}

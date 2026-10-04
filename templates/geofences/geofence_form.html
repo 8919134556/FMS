@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Geofence{% else %}New Geofence{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'geofences:geofence_list' %}">Geofences</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.name }}{% else %}New Geofence{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="pin-map" title="Basic Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.code.label }}</label>
+          {{ form.code }}
+          {% if form.code.errors %}<div class="invalid-feedback d-block">{{ form.code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="geo-alt" title="Boundary" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.center_latitude.label }}</label>
+          {{ form.center_latitude }}
+          {% if form.center_latitude.errors %}<div class="invalid-feedback d-block">{{ form.center_latitude.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.center_longitude.label }}</label>
+          {{ form.center_longitude }}
+          {% if form.center_longitude.errors %}<div class="invalid-feedback d-block">{{ form.center_longitude.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.radius_meters.label }}</label>
+          {{ form.radius_meters }}
+          {% if form.radius_meters.errors %}<div class="invalid-feedback d-block">{{ form.radius_meters.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="diagram-3" title="Ownership / Context" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.site.label }}</label>
+          {{ form.site }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.branch.label }}</label>
+          {{ form.branch }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="bell" title="Notifications" %}
+      <div class="row g-3">
+        <div class="col-md-6 form-check">
+          {{ form.notify_on_enter }}
+          <label class="form-check-label" for="{{ form.notify_on_enter.id_for_label }}">{{ form.notify_on_enter.label }}</label>
+        </div>
+        <div class="col-md-6 form-check">
+          {{ form.notify_on_exit }}
+          <label class="form-check-label" for="{{ form.notify_on_exit.id_for_label }}">{{ form.notify_on_exit.label }}</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'geofences:geofence_detail' uuid=object.uuid %}{% else %}{% url 'geofences:geofence_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Geofence…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Geofence{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

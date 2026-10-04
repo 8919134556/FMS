@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Role{% else %}New Role{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'accounts_portal:role_list' %}">Roles</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.name }}{% else %}New Role{% endif %}</h1>
+      <p class="page-subtitle">Permissions are managed from the role's detail page after saving</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate style="max-width: 640px;">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-section">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.code.label }}</label>
+          {{ form.code }}
+          {% if form.code.errors %}<div class="invalid-feedback d-block">{{ form.code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description }}
+        </div>
+        <div class="col-12 form-check">
+          {{ form.is_active }}
+          <label class="form-check-label text-small" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% url 'accounts_portal:role_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">{% if object %}Save Changes{% else %}Create Role{% endif %}</button>
+    </div>
+  </form>
+{% endblock %}

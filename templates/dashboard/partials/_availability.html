@@ -1,0 +1,57 @@
+{% load fms_extras %}
+  {% comment %}============ Section 5+6: Vehicle Availability | Driver Availability ============{% endcomment %}
+  <div class="dashboard-row cols-2">
+    {% if can_view_vehicle %}
+      <div class="card-fms chart-card">
+        <span class="section-title" style="font-size:.95rem;">Vehicle Availability</span>
+        {% if fleet_status_error %}
+          <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load vehicle data.</div>
+        {% elif fleet_status.total %}
+          <div class="stat-row-list mt-2">
+            <a href="/fleet/vehicles/?availability=AVAILABLE" class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-success"><span class="dot"></span>Available</span></span><span class="stat-row-value">{{ fleet_status.available }}</span></a>
+            <a href="/fleet/vehicles/?availability=ON_TRIP" class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-info"><span class="dot"></span>On Trip</span></span><span class="stat-row-value">{{ fleet_status.on_trip }}</span></a>
+            <a href="/fleet/vehicles/?availability=MAINTENANCE" class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-warning"><span class="dot"></span>Maintenance</span></span><span class="stat-row-value">{{ fleet_status.maintenance }}</span></a>
+            <a href="/fleet/vehicles/?status=INACTIVE" class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-neutral"><span class="dot"></span>Inactive</span></span><span class="stat-row-value">{{ fleet_status.inactive }}</span></a>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="truck-front" title="No vehicles yet" message="Add your first vehicle to see availability." %}
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if can_view_driver %}
+      <div class="card-fms chart-card">
+        <span class="section-title" style="font-size:.95rem;">Driver Availability</span>
+        {% if driver_availability_error %}
+          <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load driver data.</div>
+        {% elif driver_availability.total %}
+          <div class="stat-row-list mt-2 mb-3">
+            <div class="stat-row"><span class="cell-secondary">Total Drivers</span><span class="stat-row-value">{{ driver_availability.total }}</span></div>
+            <a href="/fleet/drivers/?status=ACTIVE" class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-success"><span class="dot"></span>Available</span></span><span class="stat-row-value">{{ driver_availability.available }}</span></a>
+            <div class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-info"><span class="dot"></span>Assigned</span></span><span class="stat-row-value">{{ driver_availability.assigned }}</span></div>
+            <div class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-info"><span class="dot"></span>On Trip</span></span><span class="stat-row-value">{{ driver_availability.on_trip }}</span></div>
+            <a href="/fleet/drivers/?status=INACTIVE" class="stat-row"><span class="d-flex align-items-center gap-2"><span class="status-pill tone-neutral"><span class="dot"></span>Inactive</span></span><span class="stat-row-value">{{ driver_availability.inactive }}</span></a>
+          </div>
+          {% if driver_availability.table_rows %}
+            <div class="table-responsive-fms">
+              <table class="table table-sm">
+                <thead><tr><th>Driver</th><th>Vehicle</th><th>Current Trip</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for row in driver_availability.table_rows %}
+                    <tr>
+                      <td><a href="{% url 'drivers:driver_detail' uuid=row.driver.uuid %}">{{ row.driver.get_full_name }}</a></td>
+                      <td class="cell-secondary">{% if row.vehicle %}{{ row.vehicle.registration_number }}{% else %}—{% endif %}</td>
+                      <td class="cell-secondary">{% if row.trip %}<a href="{% url 'trips:trip_detail' uuid=row.trip.uuid %}">{{ row.trip.trip_number }}</a>{% else %}—{% endif %}</td>
+                      <td>{% if row.status == "On Trip" %}{% include "components/status_badge.html" with status="ON_TRIP" label="On Trip" %}{% else %}{% include "components/status_badge.html" with status="ASSIGNED" label="Assigned" %}{% endif %}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        {% else %}
+          {% include "components/empty_state.html" with icon="person-badge" title="No drivers yet" message="Add your first driver to see availability." %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>

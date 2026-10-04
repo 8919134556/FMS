@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms"><span>Administration</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Settings</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Settings</h1>
+      <p class="page-subtitle">App-wide branding, localization, and operational thresholds.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+    <fieldset {% if not can_update %}disabled{% endif %}>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="building" title="Branding" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.company_name.label }}</label>
+          {{ form.company_name }}
+          <p class="text-small text-muted-fms mt-1 mb-0">Shown in the sidebar and browser tab. Leave blank to use the default.</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.support_email.label }}</label>
+          {{ form.support_email }}
+          {% if form.support_email.errors %}<div class="invalid-feedback d-block">{{ form.support_email.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.support_phone.label }}</label>
+          {{ form.support_phone }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="globe" title="Localization" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.default_timezone.label }}</label>
+          {{ form.default_timezone }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.default_currency.label }}</label>
+          {{ form.default_currency }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.date_format.label }}</label>
+          {{ form.date_format }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="sliders" title="Operational Thresholds" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.document_expiry_warning_days.label }}</label>
+          {{ form.document_expiry_warning_days }}
+          <p class="text-small text-muted-fms mt-1 mb-0">Drives the "Expiring Soon" count on Documents and the Dashboard.</p>
+          {% if form.document_expiry_warning_days.errors %}<div class="invalid-feedback d-block">{{ form.document_expiry_warning_days.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.maintenance_due_soon_days.label }}</label>
+          {{ form.maintenance_due_soon_days }}
+          <p class="text-small text-muted-fms mt-1 mb-0">Drives the "Due Soon" count on Maintenance and the Dashboard.</p>
+          {% if form.maintenance_due_soon_days.errors %}<div class="invalid-feedback d-block">{{ form.maintenance_due_soon_days.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    </fieldset>
+
+    {% if can_update %}
+      <div class="form-actions-sticky">
+        <button type="submit" class="btn btn-primary" data-submit-loading="Saving Settings…">Save Settings</button>
+      </div>
+    {% else %}
+      <p class="text-small text-muted-fms">You have view-only access to Settings.</p>
+    {% endif %}
+  </form>
+{% endblock %}

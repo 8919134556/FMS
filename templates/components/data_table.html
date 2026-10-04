@@ -1,0 +1,20 @@
+{% comment %}
+Table card header/toolbar. Usage:
+  {% include "components/data_table.html" with title="All Users" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="New User" can_create=can_create %}
+Wrap this include, your <table>, and components/pagination.html together inside
+a single <div class="table-card">...</div> — see templates/accounts/user_list.html.
+{% endcomment %}
+<div class="table-card-header">
+  <div class="table-card-title">
+    <span class="section-title">{{ title }}</span>
+    {% if count is not None %}<span class="text-small text-muted-fms ms-2">{{ count }} total</span>{% endif %}
+  </div>
+  <div class="table-card-actions d-flex gap-2">
+    {% if export_url %}
+      <a href="{{ export_url }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download me-1"></i>Export</a>
+    {% endif %}
+    {% if create_url and can_create %}
+      <a href="{{ create_url }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>{{ create_label|default:"Add New" }}</a>
+    {% endif %}
+  </div>
+</div>

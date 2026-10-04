@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Driver{% else %}New Driver{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'drivers:driver_list' %}">Drivers</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.get_full_name }}{% else %}New Driver{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="person-vcard" title="Personal Information" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          {{ form.profile_photo }}
+          {% if form.profile_photo.errors %}<div class="invalid-feedback d-block">{{ form.profile_photo.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">JPG or PNG, up to {{ MAX_UPLOAD_SIZE_MB|default:5 }}MB.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.employee_id.label }}</label>
+          {{ form.employee_id }}
+          {% if form.employee_id.errors %}<div class="invalid-feedback d-block">{{ form.employee_id.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.first_name.label }}</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}<div class="invalid-feedback d-block">{{ form.first_name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.middle_name.label }}</label>
+          {{ form.middle_name }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.last_name.label }}</label>
+          {{ form.last_name }}
+          {% if form.last_name.errors %}<div class="invalid-feedback d-block">{{ form.last_name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.date_of_birth.label }}</label>
+          {{ form.date_of_birth }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.gender.label }}</label>
+          {{ form.gender }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.mobile_number.label }}</label>
+          {{ form.mobile_number }}
+          {% if form.mobile_number.errors %}<div class="invalid-feedback d-block">{{ form.mobile_number.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.alternate_mobile_number.label }}</label>
+          {{ form.alternate_mobile_number }}
+          {% if form.alternate_mobile_number.errors %}<div class="invalid-feedback d-block">{{ form.alternate_mobile_number.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.email.label }}</label>
+          {{ form.email }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="geo-alt" title="Address" %}
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">{{ form.address.label }}</label>
+          {{ form.address }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.city.label }}</label>
+          {{ form.city }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.state.label }}</label>
+          {{ form.state }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.country.label }}</label>
+          {{ form.country }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.pincode.label }}</label>
+          {{ form.pincode }}
+          {% if form.pincode.errors %}<div class="invalid-feedback d-block">{{ form.pincode.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="briefcase" title="Employment" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.driver_type.label }}</label>
+          {{ form.driver_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.employment_type.label }}</label>
+          {{ form.employment_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.employment_status.label }}</label>
+          {{ form.employment_status }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.vendor.label }}</label>
+          {{ form.vendor }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.client.label }}</label>
+          {{ form.client }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.branch.label }}</label>
+          {{ form.branch }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.date_of_joining.label }}</label>
+          {{ form.date_of_joining }}
+        </div>
+      </div>
+      <p class="text-small text-muted-fms mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Vehicle assignment is managed from the driver's detail page, not this form.
+      </p>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="card-heading" title="Driver License" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.license_number.label }}</label>
+          {{ form.license_number }}
+          {% if form.license_number.errors %}<div class="invalid-feedback d-block">{{ form.license_number.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.license_type.label }}</label>
+          {{ form.license_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.issuing_authority.label }}</label>
+          {{ form.issuing_authority }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.license_issue_date.label }}</label>
+          {{ form.license_issue_date }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.license_expiry_date.label }}</label>
+          {{ form.license_expiry_date }}
+          {% if object.license_expiry_status == "EXPIRED" %}
+            <div class="form-text text-danger"><i class="bi bi-exclamation-triangle me-1"></i>This license has expired.</div>
+          {% elif object.license_expiry_status == "EXPIRING_SOON" %}
+            <div class="form-text" style="color: var(--fms-warning);"><i class="bi bi-exclamation-circle me-1"></i>Expires within {{ object.LICENSE_EXPIRY_WARNING_DAYS }} days.</div>
+          {% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.issuing_state.label }}</label>
+          {{ form.issuing_state }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="award" title="Professional" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.experience_years.label }}</label>
+          {{ form.experience_years }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.preferred_shift.label }}</label>
+          {{ form.preferred_shift }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="telephone-plus" title="Emergency Contact" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.emergency_contact_name.label }}</label>
+          {{ form.emergency_contact_name }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.emergency_contact_number.label }}</label>
+          {{ form.emergency_contact_number }}
+          {% if form.emergency_contact_number.errors %}<div class="invalid-feedback d-block">{{ form.emergency_contact_number.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-secondary d-flex align-items-start gap-2">
+      <i class="bi bi-info-circle mt-1"></i>
+      <div>Driver License, Identity Proof, and Medical Certificate uploads move into the driver's Documents tab once that module ships.</div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'drivers:driver_detail' uuid=object.uuid %}{% else %}{% url 'drivers:driver_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Driver…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Driver{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

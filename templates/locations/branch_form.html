@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Branch{% else %}New Branch{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'locations:branch_list' %}">Branches / Depots</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.name }}{% else %}New Branch{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="diagram-3" title="Basic Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.code.label }}</label>
+          {{ form.code }}
+          {% if form.code.errors %}<div class="invalid-feedback d-block">{{ form.code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.branch_type.label }}</label>
+          {{ form.branch_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.client.label }}</label>
+          {{ form.client }}
+          <p class="text-small text-muted-fms mt-1 mb-0">Optional — leave blank for a Zentora-operated branch not tied to one client.</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.manager.label }}</label>
+          {{ form.manager }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="person-vcard" title="Contact" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.phone.label }}</label>
+          {{ form.phone }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.email.label }}</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="pin-map" title="Address" %}
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">{{ form.address.label }}</label>
+          {{ form.address }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.city.label }}</label>
+          {{ form.city }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.state.label }}</label>
+          {{ form.state }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.country.label }}</label>
+          {{ form.country }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.pincode.label }}</label>
+          {{ form.pincode }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'locations:branch_detail' uuid=object.uuid %}{% else %}{% url 'locations:branch_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Branch…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Branch{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

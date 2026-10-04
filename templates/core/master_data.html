@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Master Data · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms"><span>Administration</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Master Data</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Master Data</h1>
+      <p class="page-subtitle">Centralize clients, operational locations and company branches.</p>
+    </div>
+  </div>
+
+  {% if not has_any_master_data_access %}
+    {% include "components/empty_state.html" with icon="lock" title="No access to Master Data" message="You don't have view access to Clients, Sites, or Branches. Contact an administrator if you need this." %}
+  {% else %}
+    <div class="row g-3 mb-3">
+      {% if can_view_client %}
+        <div class="col-md-4">
+          <div class="card-fms p-3 p-md-4 h-100 d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="avatar-chip" style="width:40px;height:40px;border-radius:9px;font-size:16px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                <i class="bi bi-building"></i>
+              </span>
+              <span class="section-title" style="font-size:.95rem;">Clients</span>
+            </div>
+            <div class="kpi-value">{{ client_count }}</div>
+            <p class="cell-secondary mb-3">{{ active_client_count }} active client{{ active_client_count|pluralize }}</p>
+            <a href="{% url 'clients:client_list' %}" class="btn btn-outline-secondary btn-sm mt-auto">Manage Clients</a>
+          </div>
+        </div>
+      {% endif %}
+      {% if can_view_site %}
+        <div class="col-md-4">
+          <div class="card-fms p-3 p-md-4 h-100 d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="avatar-chip" style="width:40px;height:40px;border-radius:9px;font-size:16px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                <i class="bi bi-geo-alt"></i>
+              </span>
+              <span class="section-title" style="font-size:.95rem;">Sites</span>
+            </div>
+            <div class="kpi-value">{{ site_count }}</div>
+            <p class="cell-secondary mb-3">{{ active_site_count }} active operational site{{ active_site_count|pluralize }}</p>
+            <a href="{% url 'locations:site_list' %}" class="btn btn-outline-secondary btn-sm mt-auto">Manage Sites</a>
+          </div>
+        </div>
+      {% endif %}
+      {% if can_view_branch %}
+        <div class="col-md-4">
+          <div class="card-fms p-3 p-md-4 h-100 d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="avatar-chip" style="width:40px;height:40px;border-radius:9px;font-size:16px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                <i class="bi bi-diagram-3"></i>
+              </span>
+              <span class="section-title" style="font-size:.95rem;">Branches</span>
+            </div>
+            <div class="kpi-value">{{ branch_count }}</div>
+            <p class="cell-secondary mb-3">{{ active_branch_count }} active company branch{{ active_branch_count|pluralize:"es" }}</p>
+            <a href="{% url 'locations:branch_list' %}" class="btn btn-outline-secondary btn-sm mt-auto">Manage Branches</a>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card-fms">
+      <span class="section-title" style="font-size:.95rem;">Recently Added</span>
+      {% if recent_items %}
+        <div class="table-responsive-fms mt-2">
+          <table class="table">
+            <thead><tr><th>Type</th><th>Record</th><th>Details</th><th>Created</th></tr></thead>
+            <tbody>
+              {% for item in recent_items %}
+                <tr>
+                  <td class="cell-secondary"><i class="bi bi-{{ item.icon }} me-1"></i>{{ item.type }}</td>
+                  <td><a href="{{ item.url }}">{{ item.label }}</a></td>
+                  <td class="cell-secondary">{{ item.sub }}</td>
+                  <td class="cell-secondary">{{ item.created_at|date:"M d, Y H:i" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        {% include "components/empty_state.html" with icon="database" title="No master data yet" message="Clients, sites and branches you add will show up here." %}
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

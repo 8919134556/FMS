@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ command.get_command_type_display }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'tracking:command_list' %}">Commands</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ command.get_command_type_display }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-terminal"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ command.get_command_type_display }}</h1>
+          {% include "components/status_badge.html" with status=command.status label=command.get_status_display %}
+        </div>
+        <p class="page-subtitle mb-0">
+          <a href="{% url 'tracking:device_detail' uuid=command.device.uuid %}">{{ command.device.imei }}</a>
+          &middot; Created {{ command.created_at|date:"M d, H:i" }}
+          {% if command.created_by %} by {{ command.created_by.get_full_name|default:command.created_by.email }}{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_cancel %}
+        <form method="post" action="{% url 'tracking:command_cancel' uuid=command.uuid %}" data-confirm="Cancel this command?">
+          {% csrf_token %}<button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+        </form>
+      {% endif %}
+      {% if can_retry %}
+        <form method="post" action="{% url 'tracking:command_retry' uuid=command.uuid %}">
+          {% csrf_token %}<button type="submit" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise me-1"></i>Retry</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Delivery Timeline</span>
+        <div class="timeline mt-3">
+          <div class="timeline-item"><div class="d-flex justify-content-between"><span>Created</span><span class="cell-secondary">{{ command.created_at|date:"M d, H:i:s" }}</span></div></div>
+          <div class="timeline-item"><div class="d-flex justify-content-between"><span>Queued</span><span class="cell-secondary">{{ command.queued_at|date:"M d, H:i:s"|default:"—" }}</span></div></div>
+          <div class="timeline-item"><div class="d-flex justify-content-between"><span>Sent</span><span class="cell-secondary">{{ command.sent_at|date:"M d, H:i:s"|default:"—" }}</span></div></div>
+          <div class="timeline-item"><div class="d-flex justify-content-between"><span>Acknowledged</span><span class="cell-secondary">{{ command.acknowledged_at|date:"M d, H:i:s"|default:"—" }}</span></div></div>
+          <div class="timeline-item"><div class="d-flex justify-content-between"><span>Completed</span><span class="cell-secondary">{{ command.completed_at|date:"M d, H:i:s"|default:"—" }}</span></div></div>
+          {% if command.expires_at %}
+            <div class="timeline-item"><div class="d-flex justify-content-between"><span>Expires</span><span class="cell-secondary">{{ command.expires_at|date:"M d, H:i:s" }}</span></div></div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if command.last_error %}
+        <div class="alert alert-warning d-flex align-items-start gap-2">
+          <i class="bi bi-exclamation-triangle mt-1"></i>
+          <div><strong>Last Error:</strong> {{ command.last_error }}</div>
+        </div>
+      {% endif %}
+
+      {% if command.response_payload %}
+        <div class="card-fms">
+          <span class="section-title" style="font-size:.95rem;">Response Payload</span>
+          <pre class="text-small mt-2 mb-0" style="white-space:pre-wrap;">{{ command.response_payload }}</pre>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Command Details</span>
+        <div class="d-flex flex-column gap-2 mt-2">
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Device</span><span><a href="{% url 'tracking:device_detail' uuid=command.device.uuid %}">{{ command.device.imei }}</a></span></div>
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Type</span><span>{{ command.get_command_type_display }}</span></div>
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Status</span><span>{{ command.get_status_display }}</span></div>
+          <div class="d-flex justify-content-between"><span class="cell-secondary">Retries</span><span>{{ command.retry_count }} / {{ command.max_retries }}</span></div>
+          {% if command.payload %}
+            <div><span class="cell-secondary">Payload</span><pre class="text-small mt-1 mb-0" style="white-space:pre-wrap;">{{ command.payload }}</pre></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

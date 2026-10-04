@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load static fms_extras %}
+{% block title %}Trips · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/dispatch_board.css' %}">{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "trip" "create" as can_create %}
+  {% has_module_perm request.user "trip" "update" as can_update %}
+  {% has_module_perm request.user "trip" "archive" as can_cancel %}
+
+  <div class="breadcrumb-fms"><span>Tracking</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Trips</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Trips</h1>
+      <p class="page-subtitle">Manage, schedule and monitor fleet trips.</p>
+    </div>
+    {% if can_create %}
+      <div class="page-header-actions">
+        <a href="{{ create_url }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Create Trip</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="trip-kpi-grid mb-3">
+    {% include "components/kpi_card.html" with label="Total Trips" value=total_trip_count icon="signpost-split" tone="primary" href=kpi_urls.total %}
+    {% include "components/kpi_card.html" with label="Scheduled" value=status_counts.SCHEDULED icon="calendar-check" tone="purple" href=kpi_urls.scheduled %}
+    {% include "components/kpi_card.html" with label="Active" value=active_trip_count icon="truck" tone="info" %}
+    {% include "components/kpi_card.html" with label="Delayed" value=status_counts.DELAYED icon="exclamation-triangle" tone="warning" href=kpi_urls.delayed %}
+    {% include "components/kpi_card.html" with label="Completed" value=status_counts.COMPLETED icon="check-circle" tone="success" href=kpi_urls.completed %}
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="dispatch-quick-filters">
+    {% for pill in status_pills %}
+      <a href="?{% querystring_replace status=pill.value %}" class="quick-filter-pill {% if current_filters.status == pill.value %}active{% endif %}">
+        {{ pill.label }}<span class="pill-count">{{ pill.count }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="table-card mt-3">
+    {% include "components/data_table.html" with title="All Trips" count=page_obj.paginator.count export_url=export_url create_url="" can_create=False %}
+
+    {% if trips %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Trip</th>
+              <th>Client</th>
+              <th>Route</th>
+              <th>Vehicle</th>
+              <th>Driver</th>
+              <th>Schedule</th>
+              <th>Distance</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for trip in trips %}
+              <tr>
+                <td>
+                  <a href="{% url 'trips:trip_detail' uuid=trip.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                      <i class="bi bi-signpost-split"></i>
+                    </span>
+                    <span>
+                      <span class="d-block" style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ trip.trip_number }}</span>
+                      <span class="d-block cell-secondary" style="font-size:.72rem;">{{ trip.get_trip_type_display }}</span>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">{{ trip.client.client_name }}</td>
+                <td class="cell-secondary" title="{{ trip.origin_site.site_name }} → {{ trip.destination_site.site_name }}">
+                  <span class="d-block text-truncate" style="max-width:220px;">{{ trip.origin_site.site_name }}</span>
+                  <span class="d-block text-truncate" style="max-width:220px;"><i class="bi bi-arrow-down-short"></i> {{ trip.destination_site.site_name }}</span>
+                </td>
+                <td class="cell-secondary">
+                  {% if trip.vehicle %}<a href="{% url 'vehicles:vehicle_detail' uuid=trip.vehicle.uuid %}">{{ trip.vehicle.registration_number }}</a>{% else %}<span class="text-muted-fms">Unassigned</span>{% endif %}
+                </td>
+                <td class="cell-secondary">
+                  {% if trip.driver %}<a href="{% url 'drivers:driver_detail' uuid=trip.driver.uuid %}">{{ trip.driver.get_full_name }}</a>{% else %}<span class="text-muted-fms">Unassigned</span>{% endif %}
+                </td>
+                <td class="cell-secondary">
+                  <span class="d-block">{{ trip.scheduled_start|date:"M d, H:i" }}</span>
+                  <span class="d-block" style="font-size:.72rem;">
+                    {% if trip.scheduled_start > now %}in {{ trip.scheduled_start|timeuntil }}{% else %}{{ trip.scheduled_start|timesince }} ago{% endif %}
+                  </span>
+                </td>
+                <td class="cell-secondary">{% if trip.actual_distance %}{{ trip.actual_distance }} km{% elif trip.planned_distance %}{{ trip.planned_distance }} km (planned){% else %}—{% endif %}</td>
+                <td>{% include "components/status_badge.html" with status=trip.priority label=trip.get_priority_display %}</td>
+                <td>{% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown" aria-label="Trip actions" onclick="event.stopPropagation();"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'trips:trip_detail' uuid=trip.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% if can_update and trip.status in editable_statuses %}
+                        <li><a class="dropdown-item" href="{% url 'trips:trip_edit' uuid=trip.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% if can_update %}
+                        {% if trip.status == "DRAFT" %}
+                          <li><form method="post" action="{% url 'trips:trip_schedule' uuid=trip.uuid %}">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-calendar-check"></i>Schedule</button></form></li>
+                        {% elif trip.status == "SCHEDULED" %}
+                          <li><a class="dropdown-item" href="{% url 'trips:trip_detail' uuid=trip.uuid %}"><i class="bi bi-person-check"></i>Assign</a></li>
+                        {% elif trip.status == "ASSIGNED" %}
+                          <li><form method="post" action="{% url 'trips:trip_dispatch' uuid=trip.uuid %}">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-send"></i>Dispatch</button></form></li>
+                        {% elif trip.status == "DISPATCHED" %}
+                          <li><form method="post" action="{% url 'trips:trip_start' uuid=trip.uuid %}">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-play-circle"></i>Start</button></form></li>
+                        {% elif trip.status == "IN_PROGRESS" or trip.status == "DELAYED" %}
+                          <li><a class="dropdown-item" href="{% url 'trips:trip_detail' uuid=trip.uuid %}"><i class="bi bi-check-circle"></i>Complete</a></li>
+                        {% endif %}
+                      {% endif %}
+                      {% if can_cancel and trip.status in cancellable_statuses %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'trips:trip_detail' uuid=trip.uuid %}"><i class="bi bi-x-circle"></i>Cancel</a></li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.status or current_filters.client or current_filters.vehicle or current_filters.driver or current_filters.origin or current_filters.destination or current_filters.trip_type or current_filters.priority or current_filters.date_from or current_filters.date_to %}
+        {% include "components/empty_state.html" with icon="funnel" title="No trips match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="signpost-split" title="No trips yet" message="Create your first trip to start managing fleet operations." action_url=create_url action_label="Create Trip" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

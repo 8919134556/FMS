@@ -1,0 +1,52 @@
+{% load fms_extras %}
+  {% comment %}============ Section 9+10: Client Operations | Site Operations ============{% endcomment %}
+  {% if can_view_client or can_view_site %}
+    <div class="dashboard-row cols-2">
+      {% if can_view_client %}
+        <div class="card-fms chart-card">
+          <span class="section-title" style="font-size:.95rem;">Client Operations</span>
+          {% if client_operations_error %}
+            <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load client data.</div>
+          {% elif client_operations %}
+            <div class="stat-row-list mt-2">
+              <a href="/clients/?status=ACTIVE" class="stat-row"><span class="cell-secondary">Active Clients</span><span class="stat-row-value">{{ client_operations.active_clients }}</span></a>
+              <div class="stat-row"><span class="cell-secondary">Clients With Active Trips</span><span class="stat-row-value">{{ client_operations.with_active_trips }}</span></div>
+              <div class="stat-row"><span class="cell-secondary">Clients With Delayed Trips</span><span class="stat-row-value">{{ client_operations.with_delayed_trips }}</span></div>
+              <div class="stat-row"><span class="cell-secondary">Clients With Maintenance Issues</span><span class="stat-row-value">{{ client_operations.with_maintenance_issues }}</span></div>
+            </div>
+          {% else %}
+            {% include "components/empty_state.html" with icon="building" title="No clients yet" message="Add your first client to see operations." %}
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if can_view_site %}
+        <div class="card-fms chart-card">
+          <span class="section-title" style="font-size:.95rem;">Site Operations</span>
+          <p class="text-small text-muted-fms mb-0">Most active sites — {{ date_range_label|lower }}</p>
+          {% if site_operations_error %}
+            <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load site data.</div>
+          {% elif site_operations %}
+            <div class="table-responsive-fms mt-2">
+              <table class="table table-sm">
+                <thead><tr><th>Site</th><th>Client</th><th>Trips</th><th>Out</th><th>In</th></tr></thead>
+                <tbody>
+                  {% for site in site_operations %}
+                    <tr>
+                      <td><a href="{% url 'locations:site_detail' uuid=site.uuid %}">{{ site.site_name }}</a></td>
+                      <td class="cell-secondary">{{ site.client.client_name }}</td>
+                      <td class="cell-secondary">{{ site.trips_total }}</td>
+                      <td class="cell-secondary">{{ site.outbound }}</td>
+                      <td class="cell-secondary">{{ site.inbound }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            {% include "components/empty_state.html" with icon="geo-alt" title="No site activity" message="No trips have used a site in this period." %}
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}

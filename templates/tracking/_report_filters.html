@@ -1,0 +1,28 @@
+{% comment %}
+  Shared filter row for every page under Reports — status pills (rendered by
+  the page's JS), search box, vehicle selector (All Vehicles / one vehicle,
+  scoped server-side to what the viewer can see) — plus the refresh-error
+  banner with Retry.
+
+  Params: prefix, search_placeholder, search_label, pills_label, error_noun, vehicles.
+{% endcomment %}
+<div class="live-status-bar">
+  <div class="live-status-pills" id="{{ prefix }}StatusPills" role="tablist" aria-label="{{ pills_label }}"></div>
+  <div class="live-status-controls">
+    <div class="live-search-wrap">
+      <i class="bi bi-search"></i>
+      <input type="search" id="{{ prefix }}SearchInput" class="form-control form-control-sm" placeholder="{{ search_placeholder }}" aria-label="{{ search_label }}">
+    </div>
+    <select id="{{ prefix }}VehicleFilter" class="form-select form-select-sm" aria-label="Vehicle">
+      <option value="">All Vehicles</option>
+      {% for vehicle in vehicles %}
+        <option value="{{ vehicle.uuid }}">{{ vehicle.registration_number }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+<div class="trip-refresh-error d-none" id="{{ prefix }}RefreshError">
+  <i class="bi bi-exclamation-triangle me-1"></i><span id="{{ prefix }}RefreshErrorText">Unable to refresh {{ error_noun }}</span>
+  <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="{{ prefix }}RefreshRetryBtn">Retry</button>
+</div>

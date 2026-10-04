@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ vendor.vendor_name }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "vendor" "update" as can_update %}
+  {% has_module_perm request.user "vendor" "archive" as can_archive %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'vendors:vendor_list' %}">Vendors</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ vendor.vendor_name }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-truck"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ vendor.vendor_name }}</h1>
+          {% include "components/status_badge.html" with status=vendor.status label=vendor.get_status_display %}
+        </div>
+        <p class="page-subtitle mb-0">{{ vendor.vendor_code }} &middot; {{ vendor.get_vendor_type_display }}</p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_update %}
+        <a href="{% url 'vendors:vendor_edit' uuid=vendor.uuid %}" class="btn btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+      {% endif %}
+      {% if can_archive %}
+        {% if vendor.status == "ACTIVE" %}
+          <form method="post" action="{% url 'vendors:vendor_deactivate' uuid=vendor.uuid %}" data-confirm="Deactivate {{ vendor.vendor_name }}?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-slash-circle me-1"></i>Deactivate</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'vendors:vendor_activate' uuid=vendor.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Activate</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% include "components/tabs.html" with tabs=tab_list active=active_tab %}
+
+  <div class="mt-3">
+    {% if active_tab == "vehicles" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Vehicles ({{ vendor_vehicles|length }})</span>
+        {% if vendor_vehicles %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Vehicle</th><th>Type</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for vehicle in vendor_vehicles %}
+                  <tr>
+                    <td><a href="{% url 'vehicles:vehicle_detail' uuid=vehicle.uuid %}">{{ vehicle.registration_number }}</a></td>
+                    <td class="cell-secondary">{{ vehicle.vehicle_type.name|default:"—" }}</td>
+                    <td>{% include "components/status_badge.html" with status=vehicle.status label=vehicle.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="truck-front" title="No vehicles yet" message="Vehicles supplied or serviced by this vendor will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "contracts" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Contracts ({{ vendor_contracts|length }})</span>
+        {% if vendor_contracts %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Contract #</th><th>Client</th><th>Type</th><th>End</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for contract in vendor_contracts %}
+                  <tr>
+                    <td><a href="{% url 'contracts:contract_detail' uuid=contract.uuid %}">{{ contract.contract_number }}</a></td>
+                    <td class="cell-secondary">{{ contract.client.client_name|default:"—" }}</td>
+                    <td class="cell-secondary">{{ contract.get_contract_type_display }}</td>
+                    <td class="cell-secondary">{{ contract.end_date|default:"—" }}</td>
+                    <td>{% include "components/status_badge.html" with status=contract.status label=contract.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="file-earmark-text" title="No contracts yet" message="Contracts with this vendor will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "history" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+
+    {% else %}
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="card-fms mb-3">
+            <span class="section-title" style="font-size:.95rem;">Vendor Information</span>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4"><div class="cell-secondary">Type</div><div>{{ vendor.get_vendor_type_display }}</div></div>
+              <div class="col-md-8"><div class="cell-secondary">Address</div><div>{{ vendor.address|default:"—" }}{% if vendor.city %}, {{ vendor.city }}{% endif %}{% if vendor.state %}, {{ vendor.state }}{% endif %}{% if vendor.pincode %} — {{ vendor.pincode }}{% endif %}</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card-fms">
+            <span class="section-title" style="font-size:.95rem;">Contact</span>
+            <div class="d-flex flex-column gap-2 mt-2">
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Person</span><span>{{ vendor.contact_person|default:"—" }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Phone</span><span>{{ vendor.phone|default:"—" }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Email</span><span>{{ vendor.email|default:"—" }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

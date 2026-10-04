@@ -1,0 +1,22 @@
+{% load fms_extras %}
+{% if not query %}
+  <div class="command-palette-empty">
+    <div class="text-small">Start typing to search users by name, employee ID, or email.</div>
+  </div>
+{% elif results %}
+  {% for user_obj in results %}
+    <a class="result-item" href="{% url 'accounts_portal:user_detail' uuid=user_obj.uuid %}">
+      <span class="avatar-chip" style="width:26px;height:26px;font-size:10px;">{{ user_obj|initials }}</span>
+      <span class="flex-grow-1">
+        <div class="cell-primary" style="font-size:.82rem;">{{ user_obj.get_full_name }}</div>
+        <div class="cell-secondary">{{ user_obj.employee_id }} &middot; {{ user_obj.email }}</div>
+      </span>
+      <span class="status-pill tone-{{ user_obj.status|status_badge }}"><span class="dot"></span>{{ user_obj.get_status_display }}</span>
+    </a>
+  {% endfor %}
+{% else %}
+  <div class="command-palette-empty">
+    <div class="bi bi-search mb-2" style="font-size:1.3rem;"></div>
+    <div>No users match &ldquo;{{ query }}&rdquo;.</div>
+  </div>
+{% endif %}

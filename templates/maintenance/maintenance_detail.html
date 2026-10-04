@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ maintenance.maintenance_number }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "maintenance" "update" as can_update %}
+  {% has_module_perm request.user "maintenance" "archive" as can_cancel %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'maintenance:maintenance_list' %}">Maintenance</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ maintenance.maintenance_number }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+        <i class="bi bi-tools"></i>
+      </span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ maintenance.maintenance_number }}</h1>
+          {% include "components/status_badge.html" with status=maintenance.status label=maintenance.get_status_display %}
+          {% include "components/status_badge.html" with status=maintenance.priority label=maintenance.get_priority_display %}
+          {% if maintenance.urgency == "OVERDUE" %}
+            {% include "components/status_badge.html" with status="OVERDUE" label=maintenance.overdue_label %}
+          {% elif maintenance.urgency == "DUE_TODAY" %}
+            {% include "components/status_badge.html" with status="DUE_TODAY" label="Due Today" %}
+          {% endif %}
+        </div>
+        <p class="page-subtitle mb-0">
+          {{ maintenance.get_maintenance_type_display }}
+          &middot; <a href="{% url 'vehicles:vehicle_detail' uuid=maintenance.vehicle.uuid %}">{{ maintenance.vehicle.registration_number }}</a>
+          &middot; {{ maintenance.vehicle.make }} {{ maintenance.vehicle.model }}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if can_update and maintenance.status in editable_statuses %}
+        <a href="{% url 'maintenance:maintenance_edit' uuid=maintenance.uuid %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+      {% endif %}
+      {% if can_update %}
+        {% if maintenance.status == "SCHEDULED" %}
+          <form method="post" action="{% url 'maintenance:maintenance_start' uuid=maintenance.uuid %}">{% csrf_token %}<button type="submit" class="btn btn-primary"><i class="bi bi-play-circle me-1"></i>Start Service</button></form>
+        {% elif maintenance.status == "IN_PROGRESS" %}
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#completeMaintenanceModal"><i class="bi bi-check-circle me-1"></i>Complete</button>
+        {% endif %}
+      {% endif %}
+      {% if can_cancel and maintenance.status in cancellable_statuses %}
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelMaintenanceModal"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dashboard-kpi-grid mb-3">
+    {% include "components/kpi_card.html" with label="Scheduled Date" value=maintenance.scheduled_date|date:"M d, Y" icon="calendar-event" tone="primary" %}
+    {% include "components/kpi_card.html" with label="Odometer" value=maintenance.odometer_at_service icon="speedometer2" tone="info" %}
+    {% include "components/kpi_card.html" with label="Estimated Cost" value=maintenance.estimated_cost|default:"—" icon="cash-coin" tone="warning" %}
+    {% include "components/kpi_card.html" with label="Actual Cost" value=maintenance.actual_cost|default:"—" icon="cash-stack" tone="success" %}
+    {% include "components/kpi_card.html" with label="Status" value=maintenance.get_status_display icon="activity" tone="purple" %}
+  </div>
+
+  {% include "components/tabs.html" with tabs=tab_list active=active_tab %}
+
+  <div class="mt-3">
+    {% if active_tab == "service" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Service Details</span>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6"><div class="cell-secondary">Service Center</div><div>{{ maintenance.service_center|default:"—" }}</div></div>
+          <div class="col-md-6"><div class="cell-secondary">Technician</div><div>{{ maintenance.technician|default:"—" }}</div></div>
+          <div class="col-12"><div class="cell-secondary">Description</div><p class="text-small mb-0">{{ maintenance.description|default:"—" }}</p></div>
+        </div>
+        {% if maintenance.status == "COMPLETED" %}
+          <hr>
+          <span class="section-title" style="font-size:.9rem;">Completion Details</span>
+          <div class="row g-3 mt-1">
+            <div class="col-md-6"><div class="cell-secondary">Completed</div><div>{{ maintenance.completed_date|date:"M d, Y H:i" }}</div></div>
+            <div class="col-12"><div class="cell-secondary">Work Performed</div><p class="text-small mb-0">{{ maintenance.work_performed|default:"—" }}</p></div>
+            {% if maintenance.completion_notes %}<div class="col-12"><div class="cell-secondary">Notes</div><p class="text-small mb-0">{{ maintenance.completion_notes }}</p></div>{% endif %}
+          </div>
+        {% endif %}
+        {% if maintenance.notes %}
+          <hr>
+          <div class="cell-secondary">Internal Notes</div><p class="text-small mb-0">{{ maintenance.notes }}</p>
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "parts" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Parts</span>
+        {% if parts %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Part</th><th>Part Number</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr></thead>
+              <tbody>
+                {% for part in parts %}
+                  <tr>
+                    <td>{{ part.part_name }}</td>
+                    <td class="cell-secondary">{{ part.part_number|default:"—" }}</td>
+                    <td class="cell-secondary">{{ part.quantity }}</td>
+                    <td class="cell-secondary">{{ part.unit_cost }}</td>
+                    <td class="cell-secondary">{{ part.total_cost }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr><td colspan="4" class="text-end fw-semibold">Parts Total</td><td class="fw-semibold">{{ maintenance.parts_cost }}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="box-seam" title="No parts recorded" message="Parts used for this job will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "costs" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Costs</span>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4"><div class="cell-secondary">Estimated Cost</div><div>{{ maintenance.estimated_cost|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Parts Cost</div><div>{{ maintenance.parts_cost }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Labor Cost</div><div>{{ maintenance.labor_cost|default:"—" }}</div></div>
+          <div class="col-md-4"><div class="cell-secondary">Actual Cost</div><div>{{ maintenance.actual_cost|default:"—" }}</div></div>
+          {% if maintenance.cost_variance is not None %}
+            <div class="col-md-4">
+              <div class="cell-secondary">Variance</div>
+              <div class="{% if maintenance.cost_variance > 0 %}text-danger{% elif maintenance.cost_variance < 0 %}text-success{% endif %}">
+                {% if maintenance.cost_variance > 0 %}+{% endif %}{{ maintenance.cost_variance }}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+    {% elif active_tab == "documents" %}
+      {% include "components/document_tab.html" with documents=documents entity_type="maintenance" object_id=maintenance.id %}
+
+    {% elif active_tab == "history" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+
+    {% else %}
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="card-fms mb-3">
+            <span class="section-title" style="font-size:.95rem;">Maintenance Information</span>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4"><div class="cell-secondary">Type</div><div>{{ maintenance.get_maintenance_type_display }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Priority</div><div>{{ maintenance.get_priority_display }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Vehicle</div><div><a href="{% url 'vehicles:vehicle_detail' uuid=maintenance.vehicle.uuid %}">{{ maintenance.vehicle.registration_number }}</a></div></div>
+              <div class="col-md-4"><div class="cell-secondary">Scheduled Date</div><div>{{ maintenance.scheduled_date }}</div></div>
+              {% if maintenance.expected_completion_date %}<div class="col-md-4"><div class="cell-secondary">Expected Completion</div><div>{{ maintenance.expected_completion_date }}</div></div>{% endif %}
+              {% if maintenance.started_date %}<div class="col-md-4"><div class="cell-secondary">Started</div><div>{{ maintenance.started_date|date:"M d, Y H:i" }}</div></div>{% endif %}
+              {% if maintenance.completed_date %}<div class="col-md-4"><div class="cell-secondary">Completed</div><div>{{ maintenance.completed_date|date:"M d, Y H:i" }}</div></div>{% endif %}
+              {% if maintenance.duration %}<div class="col-md-4"><div class="cell-secondary">Duration</div><div>{{ maintenance.duration }}</div></div>{% endif %}
+            </div>
+            {% if maintenance.status == "CANCELLED" %}
+              <div class="alert alert-danger d-flex align-items-start gap-2 mt-3 mb-0">
+                <i class="bi bi-x-circle mt-1"></i>
+                <div><strong>Cancelled:</strong> {{ maintenance.cancellation_reason }}</div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card-fms">
+            <span class="section-title" style="font-size:.95rem;">Next Service</span>
+            <div class="d-flex flex-column gap-2 mt-2">
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Next Service Date</span><span>{{ maintenance.next_service_date|default:"—" }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Next Service Odometer</span><span>{{ maintenance.next_service_odometer|default:"—" }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if can_update and maintenance.status == "IN_PROGRESS" %}
+    <div class="modal fade" id="completeMaintenanceModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'maintenance:maintenance_complete' uuid=maintenance.uuid %}">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Complete {{ maintenance.maintenance_number }}</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label required-mark">{{ complete_form.completed_date.label }}</label>
+                {{ complete_form.completed_date }}
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">{{ complete_form.final_odometer.label }}</label>
+                  {{ complete_form.final_odometer }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ complete_form.actual_cost.label }}</label>
+                  {{ complete_form.actual_cost }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ complete_form.labor_cost.label }}</label>
+                  {{ complete_form.labor_cost }}
+                </div>
+              </div>
+              <div class="mt-3">
+                <label class="form-label">{{ complete_form.work_performed.label }}</label>
+                {{ complete_form.work_performed }}
+              </div>
+              <div class="mt-3">
+                <label class="form-label">{{ complete_form.completion_notes.label }}</label>
+                {{ complete_form.completion_notes }}
+              </div>
+              <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                  <label class="form-label">{{ complete_form.next_service_date.label }}</label>
+                  {{ complete_form.next_service_date }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ complete_form.next_service_odometer.label }}</label>
+                  {{ complete_form.next_service_odometer }}
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Complete Maintenance</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if can_cancel and maintenance.status in cancellable_statuses %}
+    <div class="modal fade" id="cancelMaintenanceModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'maintenance:maintenance_cancel' uuid=maintenance.uuid %}">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Cancel {{ maintenance.maintenance_number }}</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <label class="form-label required-mark">{{ cancel_form.cancellation_reason.label }}</label>
+              {{ cancel_form.cancellation_reason }}
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep Job</button>
+              <button type="submit" class="btn btn-danger">Cancel Maintenance</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Site{% else %}New Site{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'locations:site_list' %}">Sites</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.site_name }}{% else %}New Site{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="geo-alt" title="Basic Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.site_code.label }}</label>
+          {{ form.site_code }}
+          {% if form.site_code.errors %}<div class="invalid-feedback d-block">{{ form.site_code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.site_name.label }}</label>
+          {{ form.site_name }}
+          {% if form.site_name.errors %}<div class="invalid-feedback d-block">{{ form.site_name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.site_type.label }}</label>
+          {{ form.site_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.client.label }}</label>
+          {{ form.client }}
+          {% if form.client.errors %}<div class="invalid-feedback d-block">{{ form.client.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.branch.label }}</label>
+          {{ form.branch }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="person-vcard" title="Site Contact" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.contact_name.label }}</label>
+          {{ form.contact_name }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.contact_phone.label }}</label>
+          {{ form.contact_phone }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.contact_email.label }}</label>
+          {{ form.contact_email }}
+          {% if form.contact_email.errors %}<div class="invalid-feedback d-block">{{ form.contact_email.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.operating_hours.label }}</label>
+          {{ form.operating_hours }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="pin-map" title="Address & Coordinates" %}
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">{{ form.address_line_1.label }}</label>
+          {{ form.address_line_1 }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.city.label }}</label>
+          {{ form.city }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.state.label }}</label>
+          {{ form.state }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.country.label }}</label>
+          {{ form.country }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.pincode.label }}</label>
+          {{ form.pincode }}
+          {% if form.pincode.errors %}<div class="invalid-feedback d-block">{{ form.pincode.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.latitude.label }}</label>
+          {{ form.latitude }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.longitude.label }}</label>
+          {{ form.longitude }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="journal-text" title="Notes" %}
+      <div class="row g-3">
+        <div class="col-12">
+          {{ form.notes }}
+        </div>
+      </div>
+      <p class="text-small text-muted-fms mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Trips and documents linked to this site are managed from the site's detail page, not this form.
+      </p>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'locations:site_detail' uuid=object.uuid %}{% else %}{% url 'locations:site_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Site…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Site{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% comment %}
+HTMX partial — returns <option> tags for the "Related Record" select, given
+?entity_type=&q=. Included by templates/documents/document_form.html via
+hx-get, and re-triggered whenever the entity type or search box changes.
+{% endcomment %}
+<option value="">Select a record…</option>
+{% for obj in objects %}
+  <option value="{{ obj.pk }}">{{ obj }}</option>
+{% endfor %}

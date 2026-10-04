@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Live Tracking · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <link rel="stylesheet" href="{% static 'css/live_tracking.css' %}">
+{% endblock %}
+{% block content %}
+  {# No telemetry data of any kind is rendered server-side — vehicle uuid/status are non-sensitive hints only. #}
+  <div id="liveTrackingRoot"
+       data-initial-vehicle="{{ initial_vehicle_uuid }}"
+       data-initial-status="{{ initial_status }}"
+       data-fleet-api-url="{% url 'fleet-telemetry-current' %}"
+       data-vehicle-url-template="{% url 'vehicles:vehicle_detail' uuid='00000000-0000-0000-0000-000000000000' %}"
+       data-trip-url-template="{% url 'trips:trip_detail' uuid='00000000-0000-0000-0000-000000000000' %}"
+       data-devices-url="{% url 'tracking:device_list' %}"
+       data-vehicles-url="{% url 'vehicles:vehicle_list' %}"
+       data-geofences-url="{% url 'geofences:geofence_map_data' %}"
+       data-no-telemetry-url="{% url 'vehicles:vehicle_list' %}?gps=none"
+       data-no-telemetry-count="{{ no_telemetry_count }}"
+       data-timezone="{{ display_timezone }}"
+       data-can-manage-feed="{% if can_manage_feed %}1{% else %}0{% endif %}">
+
+    <div class="live-header">
+      <div class="live-header-title">
+        <span class="live-header-icon"><i class="bi bi-broadcast"></i></span>
+        <div>
+          <h1 class="page-title mb-0">Live Tracking</h1>
+          <p class="page-subtitle mb-0 live-updated-line">
+            <span class="live-refresh-dot" id="liveRefreshDot" aria-hidden="true"></span>
+            <span id="liveLastUpdated" role="status" aria-live="polite">Not yet loaded</span>
+          </p>
+        </div>
+      </div>
+      <div class="live-header-actions">
+        <label class="live-interval-field" for="liveRefreshInterval">
+          <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+          <span class="live-interval-label">Auto refresh</span>
+          <select id="liveRefreshInterval" class="form-select form-select-sm">
+            <option value="5000">5 seconds</option>
+            <option value="10000">10 seconds</option>
+            <option value="30000" selected>30 seconds</option>
+            <option value="60000">60 seconds</option>
+            <option value="300000">5 minutes</option>
+          </select>
+        </label>
+        <button type="button" class="btn btn-primary btn-sm live-refresh-btn" id="liveRefreshBtn">
+          <i class="bi bi-arrow-clockwise me-1"></i><span>Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="live-feed-notice d-none" id="fleetFeedNotice" role="alert">
+      <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+      <span id="fleetFeedNoticeText"></span>
+    </div>
+
+    <div class="live-status-bar">
+      <div class="live-status-pills" id="liveStatusPills" role="tablist" aria-label="Filter by vehicle status"></div>
+      <div class="live-status-controls">
+        <div class="live-search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="search" id="fleetSearchInput" class="form-control form-control-sm" placeholder="Search registration, driver, client…" aria-label="Search vehicles">
+        </div>
+        <div class="dropdown">
+          <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-sliders me-1"></i>Options
+          </button>
+          <div class="dropdown-menu dropdown-menu-end p-3 live-options-menu">
+            <label class="form-label text-small mb-1" for="fleetAvailabilityFilter">Availability</label>
+            <select id="fleetAvailabilityFilter" class="form-select form-select-sm mb-2" aria-label="Availability">
+              <option value="">All Vehicles</option>
+              <option value="AVAILABLE">Available</option>
+              <option value="ASSIGNED">Assigned</option>
+              <option value="ON_TRIP">On Trip</option>
+              <option value="MAINTENANCE">Maintenance</option>
+              <option value="UNAVAILABLE">Unavailable</option>
+            </select>
+            <label class="form-label text-small mb-1" for="fleetTelemetryFilter">Telemetry</label>
+            <select id="fleetTelemetryFilter" class="form-select form-select-sm" aria-label="Telemetry">
+              <option value="">All</option>
+              <option value="has">Has Telemetry</option>
+              <option value="none">No Telemetry</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="live-map-shell">
+      <div id="liveMap"></div>
+
+      <div class="map-loading-overlay" id="liveMapLoading">
+        <div class="map-loading-spinner"></div>
+      </div>
+
+      <div class="map-controls-top-right">
+        <button type="button" class="btn btn-sm btn-light" id="liveFollowToggle" title="Follow selected vehicle">
+          <i class="bi bi-crosshair"></i><span class="d-none d-md-inline ms-1">Follow</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-light" id="liveFitFleetBtn" title="Fit map to fleet">
+          <i class="bi bi-aspect-ratio"></i><span class="d-none d-md-inline ms-1">Fit Fleet</span>
+        </button>
+      </div>
+
+      <div class="map-refresh-error d-none" id="fleetRefreshError">
+        <i class="bi bi-exclamation-triangle me-1"></i><span id="fleetRefreshErrorText">Unable to refresh live data</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="fleetRefreshRetryBtn">Retry</button>
+      </div>
+
+      <div class="map-empty-overlay d-none" id="fleetEmptyState">
+        {% include "components/empty_state.html" with icon="geo-alt" title="No live vehicle positions available" message="Connect GPS devices and start sending telemetry to monitor your fleet here." %}
+        <div class="d-flex gap-2 justify-content-center mt-2">
+          <a href="{% url 'tracking:device_list' %}" class="btn btn-sm btn-primary">Manage GPS Devices</a>
+          <a href="{% url 'vehicles:vehicle_list' %}" class="btn btn-sm btn-outline-secondary">View Vehicles</a>
+        </div>
+      </div>
+
+      <div class="vehicle-floating-panel" id="vehiclePanel">
+        <div class="vehicle-panel-header">
+          <span class="section-title" style="font-size:.9rem;">Vehicle Details</span>
+          <button type="button" class="btn-close" id="vehiclePanelClose" aria-label="Close"></button>
+        </div>
+        <div class="vehicle-panel-body" id="vehiclePanelBody"></div>
+      </div>
+    </div>
+
+    <div class="vehicle-status-section card-fms mt-3">
+      <div class="vehicle-status-header">
+        <div class="vehicle-status-header-left">
+          <span class="section-title" style="font-size:.95rem;">Vehicle Status</span>
+          <span class="text-small text-muted-fms" id="vehicleStatusCounts">Loading fleet…</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="vehicleStatusRefreshBtn" title="Refresh">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </div>
+
+      <div class="table-responsive-fms">
+        <table class="table" id="vehicleStatusTable">
+          <thead>
+            <tr>
+              <th>Vehicle / Driver</th>
+              <th>Ignition</th>
+              <th>Track Time</th>
+              <th>Speed</th>
+              <th>Odometer</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="vehicleStatusTableBody">
+            {% include "components/loading.html" with rows=6 cols=8 %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-none" id="vehicleStatusEmpty">
+        {% include "components/empty_state.html" with icon="funnel" title="No vehicles match your current filters" message="Try adjusting your search or filters." %}
+      </div>
+
+      <div class="fleet-no-telemetry-note d-none" id="fleetNoTelemetryNote">
+        <p class="text-small text-muted-fms mb-2">{{ no_telemetry_count }} vehicle{{ no_telemetry_count|pluralize }} with no telemetry — these have never reported a GPS position and can't be shown here.</p>
+        <a href="{% url 'vehicles:vehicle_list' %}?gps=none" class="btn btn-sm btn-outline-secondary">View Vehicles Without GPS</a>
+      </div>
+    </div>
+  </div>
+
+  {% comment %}
+    Live Map: ONE vehicle, live. A fresh Leaflet map is created when the modal opens and torn down on
+    close (see static/js/live_tracking.js) — same marker, tiles and fleet feed as the main map, which
+    keeps showing every vehicle. It shows the vehicle's CURRENT position only (no route/history);
+    position and details update on the page's own auto-refresh.
+  {% endcomment %}
+  <div class="modal fade" id="liveVehicleModal" tabindex="-1" aria-hidden="true" aria-labelledby="liveVehicleModalTitle">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl live-vehicle-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="live-vehicle-heading">
+            <span class="live-header-icon"><i class="bi bi-geo-alt"></i></span>
+            <div class="min-w-0">
+              <h3 class="section-title mb-0" id="liveVehicleModalTitle" style="font-size:1.05rem;">Live Map</h3>
+              <span class="text-small text-muted-fms" id="liveVehicleModalSubtitle"></span>
+            </div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-0">
+          <div class="live-vehicle-layout">
+            <div class="live-vehicle-map-wrap">
+              <div id="liveVehicleMap" class="live-vehicle-map"></div>
+              <span class="live-vehicle-map-notice d-none" id="liveVehicleMapNotice" role="status"></span>
+            </div>
+            <aside class="live-vehicle-details" id="liveVehicleDetails" aria-live="polite"></aside>
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between">
+          <span class="text-small text-muted-fms" id="liveVehicleModalUpdated"></span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'js/auto_refresh.js' %}"></script>
+  <script src="{% static 'js/fms_format.js' %}"></script>
+  <script src="{% static 'js/fms_map.js' %}"></script>
+  <script src="{% static 'js/live_tracking.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% load fms_extras %}
+<div class="card-fms chart-card dash-panel">
+  <div class="dash-panel-header">
+    <span class="section-title" style="font-size:.95rem;">{% if activity_scope == "all" %}Recent Activity{% else %}My Recent Activity{% endif %}</span>
+    {% if activity_scope == "all" %}<span class="text-small text-muted-fms">All users</span>{% endif %}
+  </div>
+  {% if recent_activity %}
+    <div class="timeline mt-2">
+      {% for log in recent_activity %}
+        <div class="timeline-item">
+          <span class="timeline-icon"><i class="bi bi-{{ log.action|action_icon }}"></i></span>
+          <div class="timeline-body">
+            <div class="timeline-desc">
+              <strong>{{ log.get_action_display }}</strong> &middot; {{ log.module }} / {{ log.entity }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}
+            </div>
+            <div class="timeline-meta">{% if activity_scope == "all" %}{{ log.user.get_full_name|default:"System" }} &middot; {% endif %}{{ log.timestamp|date:"M d, H:i" }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% include "components/empty_state.html" with icon="journal-text" title="No activity yet" message="Actions you take in the portal will appear here as they happen." %}
+  {% endif %}
+  {% if can_view_audit %}<a href="{% url 'audit:audit_log_list' %}" class="btn btn-sm btn-ghost w-100 mt-2">View full audit log</a>{% endif %}
+</div>

@@ -1,0 +1,45 @@
+{% load fms_extras %}
+{% comment %}
+Compact KPI strip. Every card is behind the same can_view_* flag the view
+computed from the viewer's RBAC permissions, so a card for a module the
+viewer can't open is never rendered (and its number never sent).
+{% endcomment %}
+<div class="dashboard-kpi-grid is-dense">
+  {% if can_view_vehicle %}
+    {% include "components/kpi_card.html" with label="Total Vehicles" value=total_vehicles icon="truck-front" tone="primary" href="/fleet/vehicles/" %}
+    {% include "components/kpi_card.html" with label="Available Now" value=available_vehicles icon="check-circle" tone="success" href="/fleet/vehicles/?availability=AVAILABLE" %}
+  {% endif %}
+  {% if can_view_trip %}
+    {% include "components/kpi_card.html" with label="Total Trips" value=total_trips icon="signpost-split" tone="primary" href="/trips/" %}
+    {% include "components/kpi_card.html" with label="Trips In Progress" value=trips_in_progress icon="send" tone="info" href="/trips/?status=IN_PROGRESS" %}
+    {% include "components/kpi_card.html" with label="Completed Trips" value=trips_completed icon="check-circle" tone="success" href="/trips/?status=COMPLETED" %}
+    {% include "components/kpi_card.html" with label="Delayed Trips" value=trips_delayed icon="exclamation-triangle" tone="warning" href=delayed_trips_url %}
+  {% endif %}
+  {% if can_view_driver %}
+    {% include "components/kpi_card.html" with label="Active Drivers" value=active_drivers icon="person-badge" tone="purple" href="/fleet/drivers/?status=ACTIVE" %}
+  {% endif %}
+  {% if can_view_client %}
+    {% include "components/kpi_card.html" with label="Total Clients" value=total_clients icon="building" tone="primary" href="/clients/" %}
+    {% include "components/kpi_card.html" with label="Active Clients" value=active_clients icon="building" tone="info" href="/clients/?status=ACTIVE" %}
+  {% endif %}
+  {% if can_view_site %}
+    {% include "components/kpi_card.html" with label="Total Sites" value=total_sites icon="geo-alt" tone="warning" href="/sites/" %}
+  {% endif %}
+  {% if can_view_maintenance %}
+    {% include "components/kpi_card.html" with label="Maintenance Scheduled" value=maintenance_scheduled_count icon="calendar-check" tone="primary" href="/maintenance/?status=SCHEDULED" %}
+    {% include "components/kpi_card.html" with label="Maintenance Overdue" value=maintenance_overdue_count icon="tools" tone="danger" href="/maintenance/?status=OVERDUE" %}
+  {% endif %}
+  {% if can_view_document %}
+    {% include "components/kpi_card.html" with label="Total Documents" value=documents_total_count icon="file-earmark-text" tone="primary" href="/documents/" %}
+    {% include "components/kpi_card.html" with label="Documents Expiring Soon" value=documents_expiring_soon_count icon="hourglass-split" tone="warning" href="/documents/?expiry=expiring_soon" %}
+  {% endif %}
+  {% if has_any_widget or can_view_user %}
+    {% include "components/kpi_card.html" with label="Needs Attention" value=attention_items|length icon="exclamation-circle" tone="danger" %}
+  {% endif %}
+  {% if can_view_user %}
+    {% include "components/kpi_card.html" with label="Active Users" value=active_users icon="person-check" tone="success" href="/admin/users/?status=ACTIVE" %}
+  {% endif %}
+  {% if can_view_audit %}
+    {% include "components/kpi_card.html" with label="Logins Today" value=logins_today_count icon="box-arrow-in-right" tone="info" %}
+  {% endif %}
+</div>

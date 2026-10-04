@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Broadcast Notification · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'notifications:notification_list' %}">Notifications</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>Broadcast</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Broadcast Notification</h1>
+      <p class="page-subtitle">Send an in-app notification to all users, or everyone with a specific role.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="people" title="Audience" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.audience.label }}</label>
+          {{ form.audience }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.role.label }}</label>
+          {{ form.role }}
+          {% if form.role.errors %}<div class="invalid-feedback d-block">{{ form.role.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="bell" title="Message" %}
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label required-mark">{{ form.title.label }}</label>
+          {{ form.title }}
+          {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.level.label }}</label>
+          {{ form.level }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.body.label }}</label>
+          {{ form.body }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.link_url.label }}</label>
+          {{ form.link_url }}
+          <p class="text-small text-muted-fms mt-1 mb-0">Optional — where clicking the notification should take the recipient.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <button type="submit" class="btn btn-primary" data-submit-loading="Sending…">Send Notification</button>
+    </div>
+  </form>
+{% endblock %}

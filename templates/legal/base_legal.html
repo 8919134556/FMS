@@ -1,0 +1,27 @@
+{% load static %}<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Legal · {{ fms_app_name }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{% static 'css/design-tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components.css' %}">
+</head>
+<body style="background: var(--fms-bg); min-height: 100vh; padding: var(--fms-space-8) var(--fms-space-4);">
+  <div style="max-width: 720px; margin: 0 auto;">
+    <a href="{% url 'accounts:login' %}" class="text-small d-inline-flex align-items-center gap-1 mb-4">
+      <i class="bi bi-arrow-left"></i>Back to Sign In
+    </a>
+    <div class="card-fms p-4 p-md-5">
+      {% block legal_content %}{% endblock %}
+    </div>
+    <p class="text-center text-muted-fms text-small mt-4">&copy; {% now "Y" %} {{ fms_company_name }}. All rights reserved.</p>
+  </div>
+</body>
+</html>

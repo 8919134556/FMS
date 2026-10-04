@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Vehicle{% else %}New Vehicle{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'vehicles:vehicle_list' %}">Vehicles</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.registration_number }}{% else %}New Vehicle{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="upc-scan" title="Vehicle Identification" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.registration_number.label }}</label>
+          {{ form.registration_number }}
+          {% if form.registration_number.errors %}<div class="invalid-feedback d-block">{{ form.registration_number.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.vehicle_code.label }}</label>
+          {{ form.vehicle_code }}
+          {% if form.vehicle_code.errors %}<div class="invalid-feedback d-block">{{ form.vehicle_code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.vin.label }}</label>
+          {{ form.vin }}
+          {% if form.vin.errors %}<div class="invalid-feedback d-block">{{ form.vin.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.chassis_number.label }}</label>
+          {{ form.chassis_number }}
+          {% if form.chassis_number.errors %}<div class="invalid-feedback d-block">{{ form.chassis_number.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.engine_number.label }}</label>
+          {{ form.engine_number }}
+          {% if form.engine_number.errors %}<div class="invalid-feedback d-block">{{ form.engine_number.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="truck-front" title="Vehicle Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.vehicle_type.label }}</label>
+          {{ form.vehicle_type }}
+          {% if form.vehicle_type.errors %}<div class="invalid-feedback d-block">{{ form.vehicle_type.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.category.label }}</label>
+          {{ form.category }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.manufacturer.label }}</label>
+          {{ form.manufacturer }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label required-mark">{{ form.make.label }}</label>
+          {{ form.make }}
+          {% if form.make.errors %}<div class="invalid-feedback d-block">{{ form.make.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label required-mark">{{ form.model.label }}</label>
+          {{ form.model }}
+          {% if form.model.errors %}<div class="invalid-feedback d-block">{{ form.model.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.variant.label }}</label>
+          {{ form.variant }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.color.label }}</label>
+          {{ form.color }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.model_year.label }}</label>
+          {{ form.model_year }}
+          {% if form.model_year.errors %}<div class="invalid-feedback d-block">{{ form.model_year.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.manufacturing_date.label }}</label>
+          {{ form.manufacturing_date }}
+          {% if form.manufacturing_date.errors %}<div class="invalid-feedback d-block">{{ form.manufacturing_date.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="gear" title="Technical Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.fuel_type.label }}</label>
+          {{ form.fuel_type }}
+          {% if form.fuel_type.errors %}<div class="invalid-feedback d-block">{{ form.fuel_type.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.transmission_type.label }}</label>
+          {{ form.transmission_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Engine Capacity (cc)</label>
+          {{ form.engine_capacity }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.seating_capacity.label }}</label>
+          {{ form.seating_capacity }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Load Capacity (kg)</label>
+          {{ form.load_capacity }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Mileage (km/l)</label>
+          {{ form.mileage }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="building" title="Ownership" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.ownership_type.label }}</label>
+          {{ form.ownership_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.owner_name.label }}</label>
+          {{ form.owner_name }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.vendor.label }}</label>
+          {{ form.vendor }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.client.label }}</label>
+          {{ form.client }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.contract.label }}</label>
+          {{ form.contract }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.branch.label }}</label>
+          {{ form.branch }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="activity" title="Operational Information" %}
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.availability_status.label }}</label>
+          {{ form.availability_status }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.odometer_reading.label }}</label>
+          {{ form.odometer_reading }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.odometer_unit.label }}</label>
+          {{ form.odometer_unit }}
+        </div>
+      </div>
+
+      {# Trip detection: how a trip starts (movement validation) and ends (closure time). #}
+      <h4 class="section-title mt-4 mb-1" style="font-size:.9rem;">
+        <i class="bi bi-signpost-split me-1" aria-hidden="true"></i>Trip &amp; Idle Detection
+      </h4>
+      <p class="text-small text-muted-fms mb-3">
+        Ignition ON only opens a <em>candidate</em> trip. It becomes a trip once the GPS history shows the vehicle
+        really moving — enough readings at the minimum speed, or the vehicle (or its odometer) getting at least the
+        minimum distance away — so a parked vehicle with the ignition on, or a single speed spike, never creates a trip.
+        The same speed and distance decide when the vehicle is <em>stationary</em> for the Idle alert.
+      </p>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark" for="{{ form.trip_closure_minutes.id_for_label }}">Trip Closure Time</label>
+          <div class="input-group">
+            {{ form.trip_closure_minutes }}
+            <span class="input-group-text" style="font-size: var(--fms-text-small);">Minutes</span>
+          </div>
+          {% if form.trip_closure_minutes.errors %}<div class="invalid-feedback d-block">{{ form.trip_closure_minutes.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">Ignition OFF this long or longer closes the current trip; turning it back ON sooner continues the same trip. Default 5.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark" for="{{ form.trip_validation_records.id_for_label }}">Validation Records</label>
+          <div class="input-group">
+            {{ form.trip_validation_records }}
+            <span class="input-group-text" style="font-size: var(--fms-text-small);">Readings</span>
+          </div>
+          {% if form.trip_validation_records.errors %}<div class="invalid-feedback d-block">{{ form.trip_validation_records.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">Consecutive readings examined for movement after ignition ON. Default 5.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark" for="{{ form.trip_min_moving_records.id_for_label }}">Required Moving Records</label>
+          <div class="input-group">
+            {{ form.trip_min_moving_records }}
+            <span class="input-group-text" style="font-size: var(--fms-text-small);">Readings</span>
+          </div>
+          {% if form.trip_min_moving_records.errors %}<div class="invalid-feedback d-block">{{ form.trip_min_moving_records.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">How many of those must be at or above the minimum speed. Default 3.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark" for="{{ form.trip_min_speed_kmh.id_for_label }}">Minimum Movement Speed</label>
+          <div class="input-group">
+            {{ form.trip_min_speed_kmh }}
+            <span class="input-group-text" style="font-size: var(--fms-text-small);">km/h</span>
+          </div>
+          {% if form.trip_min_speed_kmh.errors %}<div class="invalid-feedback d-block">{{ form.trip_min_speed_kmh.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">A reading at or above this speed counts as moving. Default 5.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark" for="{{ form.trip_min_distance_m.id_for_label }}">Minimum Movement Distance</label>
+          <div class="input-group">
+            {{ form.trip_min_distance_m }}
+            <span class="input-group-text" style="font-size: var(--fms-text-small);">Metres</span>
+          </div>
+          {% if form.trip_min_distance_m.errors %}<div class="invalid-feedback d-block">{{ form.trip_min_distance_m.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">How far the vehicle must get from where the ignition came on. Default 50.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark" for="{{ form.idle_alert_minutes.id_for_label }}">Idle Alert After</label>
+          <div class="input-group">
+            {{ form.idle_alert_minutes }}
+            <span class="input-group-text" style="font-size: var(--fms-text-small);">Minutes</span>
+          </div>
+          {% if form.idle_alert_minutes.errors %}<div class="invalid-feedback d-block">{{ form.idle_alert_minutes.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">Ignition ON and stationary (within the movement distance) this long raises one Idle alert. Default 5.</div>
+        </div>
+      </div>
+      <p class="text-small text-muted-fms mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Driver assignment is managed from the vehicle's detail page, not this form.
+      </p>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="cash-coin" title="Financial Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.purchase_date.label }}</label>
+          {{ form.purchase_date }}
+          {% if form.purchase_date.errors %}<div class="invalid-feedback d-block">{{ form.purchase_date.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.purchase_price.label }}</label>
+          {{ form.purchase_price }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.current_value.label }}</label>
+          {{ form.current_value }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="image" title="Vehicle Image" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          {{ form.image }}
+          {% if form.image.errors %}<div class="invalid-feedback d-block">{{ form.image.errors|join:", " }}</div>{% endif %}
+          <div class="form-text">JPG or PNG, up to {{ MAX_UPLOAD_SIZE_MB|default:5 }}MB.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.remarks.label }}</label>
+          {{ form.remarks }}
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-secondary d-flex align-items-start gap-2">
+      <i class="bi bi-info-circle mt-1"></i>
+      <div>RC, Insurance, Fitness, Pollution, and Permit document uploads move into the vehicle's Documents tab once that module ships.</div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'vehicles:vehicle_detail' uuid=object.uuid %}{% else %}{% url 'vehicles:vehicle_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Vehicle…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Vehicle{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Users · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "user" "create" as can_create %}
+
+  <div class="breadcrumb-fms"><i class="bi bi-people"></i><span>Administration</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Users</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Users</h1>
+      <p class="page-subtitle">Manage administrator and operations staff accounts</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Users" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="New User" can_create=can_create %}
+
+    {% if users %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th><a class="text-reset text-decoration-none" href="?{% querystring_replace sort='employee_id' %}">Employee ID</a></th>
+              <th>User</th>
+              <th>Contact</th>
+              <th>Role</th>
+              <th><a class="text-reset text-decoration-none" href="?{% querystring_replace sort='status' %}">Status</a></th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user_obj in users %}
+              <tr>
+                <td class="cell-secondary">{{ user_obj.employee_id }}</td>
+                <td>
+                  <a href="{% url 'accounts_portal:user_detail' uuid=user_obj.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:30px;height:30px;font-size:11px;">{{ user_obj|initials }}</span>
+                    <span>
+                      <div class="row-link" style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ user_obj.get_full_name }}</div>
+                      <div class="cell-secondary">@{{ user_obj.username }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">
+                  <div>{{ user_obj.email }}</div>
+                  <div>{{ user_obj.mobile_number }}</div>
+                </td>
+                <td>{{ user_obj.role.name|default:"—" }}{% if user_obj.client %}<div class="cell-secondary"><i class="bi bi-building me-1"></i>{{ user_obj.client.client_name }}</div>{% endif %}</td>
+                <td>{% include "components/status_badge.html" with status=user_obj.status label=user_obj.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'accounts_portal:user_detail' uuid=user_obj.uuid %}"><i class="bi bi-eye me-2"></i>View</a></li>
+                      {% has_module_perm request.user "user" "update" as can_update %}
+                      {% if can_update %}
+                        <li><a class="dropdown-item" href="{% url 'accounts_portal:user_edit' uuid=user_obj.uuid %}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% include "components/empty_state.html" with icon="people" title="No users match your filters" message="Try a different search term or clear your filters." action_url=create_url action_label="Add a user" %}
+    {% endif %}
+  </div>
+{% endblock %}

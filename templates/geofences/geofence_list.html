@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Geofences · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "geofence" "create" as can_create %}
+
+  <div class="breadcrumb-fms"><span>Tracking</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Geofences</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Geofences</h1>
+      <p class="page-subtitle">Monitor vehicle entry and exit around client sites, branches, and custom zones.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Geofences" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="Add Geofence" can_create=can_create %}
+
+    {% if geofences %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Geofence</th>
+              <th>Radius</th>
+              <th>Linked To</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for geofence in geofences %}
+              <tr>
+                <td>
+                  <a href="{% url 'geofences:geofence_detail' uuid=geofence.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                      <i class="bi bi-pin-map"></i>
+                    </span>
+                    <span>
+                      <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ geofence.name }}</div>
+                      <div class="cell-secondary">{{ geofence.code }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">{{ geofence.radius_meters }} m</td>
+                <td class="cell-secondary">
+                  {% if geofence.site %}<a href="{% url 'locations:site_detail' uuid=geofence.site.uuid %}">{{ geofence.site.site_name }}</a>
+                  {% elif geofence.branch %}<a href="{% url 'locations:branch_detail' uuid=geofence.branch.uuid %}">{{ geofence.branch.name }}</a>
+                  {% else %}—{% endif %}
+                </td>
+                <td>{% include "components/status_badge.html" with status=geofence.status label=geofence.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'geofences:geofence_detail' uuid=geofence.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% has_module_perm request.user "geofence" "update" as can_update %}
+                      {% if can_update %}
+                        <li><a class="dropdown-item" href="{% url 'geofences:geofence_edit' uuid=geofence.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% has_module_perm request.user "geofence" "archive" as can_archive %}
+                      {% if can_archive %}
+                        <li><hr class="dropdown-divider"></li>
+                        {% if geofence.status == "ACTIVE" %}
+                          <li>
+                            <form method="post" action="{% url 'geofences:geofence_deactivate' uuid=geofence.uuid %}" data-confirm="Deactivate {{ geofence.name }}?">
+                              {% csrf_token %}<button type="submit" class="dropdown-item text-danger"><i class="bi bi-slash-circle"></i>Deactivate</button>
+                            </form>
+                          </li>
+                        {% else %}
+                          <li>
+                            <form method="post" action="{% url 'geofences:geofence_activate' uuid=geofence.uuid %}">
+                              {% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-check-circle"></i>Activate</button>
+                            </form>
+                          </li>
+                        {% endif %}
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.status %}
+        {% include "components/empty_state.html" with icon="funnel" title="No geofences match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="pin-map" title="No geofences yet" message="Add a geofence to monitor when vehicles enter or exit a zone." action_url=create_url action_label="Add Geofence" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

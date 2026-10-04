@@ -1,0 +1,44 @@
+{% load static %}
+<div class="sidebar-brand">
+  <span class="mark">FMS</span>
+  <span class="brand-text">
+    <div class="brand-title">{{ fms_app_name }}</div>
+    <div class="brand-subtitle">Fleet Management</div>
+  </span>
+</div>
+
+<div class="sidebar-scroll">
+  {% for section in nav_sections %}
+    <div class="nav-group" data-nav-group="{{ section.key }}">
+      <button type="button" class="nav-group-heading" data-nav-group-toggle>
+        <span>{{ section.heading }}</span>
+        <i class="bi bi-chevron-down nav-group-chevron"></i>
+      </button>
+      <div class="nav-group-items">
+        <div>
+          {% for item in section.items %}
+            {% if item.enabled %}
+              <a class="nav-link-fms {% if item.current %}active{% endif %}" href="{{ item.url }}">
+                <i class="bi bi-{{ item.icon }}"></i>
+                <span class="nav-link-label">{{ item.label }}</span>
+              </a>
+            {% else %}
+              <span class="nav-link-fms is-locked" title="{% if item.phase > 1 %}Arrives in Phase {{ item.phase }}{% else %}You don't have access to this module{% endif %}">
+                <i class="bi bi-{{ item.icon }}"></i>
+                <span class="nav-link-label">{{ item.label }}</span>
+                {% if item.phase > 1 %}<span class="nav-phase-badge">P{{ item.phase }}</span>{% endif %}
+              </span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="sidebar-footer">
+  <button type="button" class="sidebar-collapse-btn" id="fmsSidebarCollapseToggle">
+    <i class="bi bi-layout-sidebar-inset"></i>
+    <span class="nav-link-label">Collapse sidebar</span>
+  </button>
+</div>

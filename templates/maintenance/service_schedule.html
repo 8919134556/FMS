@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Service Schedule · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms"><span>Maintenance</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Service Schedule</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Service Schedule</h1>
+      <p class="page-subtitle">Scheduled maintenance grouped by urgency — Overdue, Due Today, This Week, and Upcoming.</p>
+    </div>
+    <div class="page-header-actions">
+      <a href="{% url 'maintenance:maintenance_list' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-list-ul me-1"></i>Full Maintenance List</a>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="card-fms mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="section-title" style="font-size:.95rem;">Overdue</span>
+      {% if overdue %}<span class="status-pill tone-danger"><span class="dot"></span>{{ overdue|length }}</span>{% endif %}
+    </div>
+    {% if overdue %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead><tr><th>Maintenance</th><th>Vehicle</th><th>Scheduled</th><th>Priority</th><th></th></tr></thead>
+          <tbody>
+            {% for m in overdue %}
+              <tr>
+                <td><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}">{{ m.maintenance_number }}</a><div class="cell-secondary">{{ m.get_maintenance_type_display }}</div></td>
+                <td class="cell-secondary"><a href="{% url 'vehicles:vehicle_detail' uuid=m.vehicle.uuid %}">{{ m.vehicle.registration_number }}</a></td>
+                <td class="cell-secondary">{{ m.scheduled_date|date:"M d, Y" }} &middot; {{ m.overdue_label }}</td>
+                <td>{% include "components/status_badge.html" with status=m.priority label=m.get_priority_display %}</td>
+                <td class="text-end"><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}" class="btn btn-sm btn-outline-secondary">View</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-small text-muted-fms mb-0 mt-2">No overdue maintenance.</p>
+    {% endif %}
+  </div>
+
+  <div class="card-fms mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="section-title" style="font-size:.95rem;">Due Today</span>
+      {% if due_today %}<span class="status-pill tone-warning"><span class="dot"></span>{{ due_today|length }}</span>{% endif %}
+    </div>
+    {% if due_today %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead><tr><th>Maintenance</th><th>Vehicle</th><th>Priority</th><th></th></tr></thead>
+          <tbody>
+            {% for m in due_today %}
+              <tr>
+                <td><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}">{{ m.maintenance_number }}</a><div class="cell-secondary">{{ m.get_maintenance_type_display }}</div></td>
+                <td class="cell-secondary"><a href="{% url 'vehicles:vehicle_detail' uuid=m.vehicle.uuid %}">{{ m.vehicle.registration_number }}</a></td>
+                <td>{% include "components/status_badge.html" with status=m.priority label=m.get_priority_display %}</td>
+                <td class="text-end"><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}" class="btn btn-sm btn-outline-secondary">View</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-small text-muted-fms mb-0 mt-2">No maintenance due today.</p>
+    {% endif %}
+  </div>
+
+  <div class="card-fms mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="section-title" style="font-size:.95rem;">Due This Week</span>
+      {% if due_this_week %}<span class="status-pill tone-info"><span class="dot"></span>{{ due_this_week|length }}</span>{% endif %}
+    </div>
+    {% if due_this_week %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead><tr><th>Maintenance</th><th>Vehicle</th><th>Scheduled</th><th>Priority</th><th></th></tr></thead>
+          <tbody>
+            {% for m in due_this_week %}
+              <tr>
+                <td><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}">{{ m.maintenance_number }}</a><div class="cell-secondary">{{ m.get_maintenance_type_display }}</div></td>
+                <td class="cell-secondary"><a href="{% url 'vehicles:vehicle_detail' uuid=m.vehicle.uuid %}">{{ m.vehicle.registration_number }}</a></td>
+                <td class="cell-secondary">{{ m.scheduled_date|date:"M d, Y" }}</td>
+                <td>{% include "components/status_badge.html" with status=m.priority label=m.get_priority_display %}</td>
+                <td class="text-end"><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}" class="btn btn-sm btn-outline-secondary">View</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-small text-muted-fms mb-0 mt-2">Nothing due in the next {{ due_soon_window|default:"7" }} days.</p>
+    {% endif %}
+  </div>
+
+  <div class="card-fms">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="section-title" style="font-size:.95rem;">Upcoming</span>
+      {% if upcoming %}<span class="status-pill tone-neutral"><span class="dot"></span>{{ upcoming|length }}</span>{% endif %}
+    </div>
+    {% if upcoming %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead><tr><th>Maintenance</th><th>Vehicle</th><th>Scheduled</th><th>Priority</th><th></th></tr></thead>
+          <tbody>
+            {% for m in upcoming %}
+              <tr>
+                <td><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}">{{ m.maintenance_number }}</a><div class="cell-secondary">{{ m.get_maintenance_type_display }}</div></td>
+                <td class="cell-secondary"><a href="{% url 'vehicles:vehicle_detail' uuid=m.vehicle.uuid %}">{{ m.vehicle.registration_number }}</a></td>
+                <td class="cell-secondary">{{ m.scheduled_date|date:"M d, Y" }}</td>
+                <td>{% include "components/status_badge.html" with status=m.priority label=m.get_priority_display %}</td>
+                <td class="text-end"><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}" class="btn btn-sm btn-outline-secondary">View</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      {% include "components/empty_state.html" with icon="calendar-check" title="Nothing further scheduled" message="Maintenance scheduled beyond this week will appear here." %}
+    {% endif %}
+  </div>
+{% endblock %}

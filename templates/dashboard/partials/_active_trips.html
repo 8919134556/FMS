@@ -1,0 +1,42 @@
+{% load fms_extras %}
+  {% comment %}============ Section 3: Live Operational Board ============{% endcomment %}
+  {% if can_view_trip %}
+    <div class="table-card mt-4">
+      <div class="table-card-header">
+        <span class="section-title">{{ date_range_label }}'s Active Trips</span>
+        <a href="/trips/" class="btn btn-sm btn-outline-secondary">View All Trips</a>
+      </div>
+      {% if active_trips_board_error %}
+        <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load trip data.
+          <div class="mt-2"><a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Retry</a></div>
+        </div>
+      {% elif active_trips_board %}
+        <div class="table-responsive-fms">
+          <table class="table">
+            <thead>
+              <tr><th>Trip</th><th>Client</th><th>Route</th><th>Vehicle</th><th>Driver</th><th>Scheduled</th><th>Status</th><th class="text-end">Action</th></tr>
+            </thead>
+            <tbody>
+              {% for trip in active_trips_board %}
+                <tr>
+                  <td><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}">{{ trip.trip_number }}</a></td>
+                  <td class="cell-secondary">{{ trip.client.client_name }}</td>
+                  <td class="cell-secondary">{{ trip.route_label }}</td>
+                  <td class="cell-secondary">{% if trip.vehicle %}{{ trip.vehicle.registration_number }}{% else %}—{% endif %}</td>
+                  <td class="cell-secondary">{% if trip.driver %}{{ trip.driver.get_full_name }}{% else %}—{% endif %}</td>
+                  <td class="cell-secondary">{{ trip.scheduled_start|date:"H:i" }}</td>
+                  <td>
+                    {% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}
+                    {% if trip.status == "DELAYED" %}<span class="text-small text-warning ms-1"><i class="bi bi-exclamation-triangle"></i> Delayed</span>{% endif %}
+                  </td>
+                  <td class="text-end"><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}" class="btn btn-sm btn-outline-secondary">View Trip</a></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        {% include "components/empty_state.html" with icon="signpost-split" title="No trips scheduled for today" message="Trips scheduled for this period will appear here." %}
+      {% endif %}
+    </div>
+  {% endif %}

@@ -1,0 +1,484 @@
+/* Trip Report — page-specific styles only. Shared header/status-pill/search/
+   refresh-indicator/table styles come from live_tracking.css (loaded first),
+   so this file never redefines them — see trip_report.html's extra_css block. */
+
+.trip-report-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--fms-space-3);
+}
+.trip-report-note .bi { color: var(--fms-primary); }
+
+/* ---------------- Date-range bar ---------------- */
+
+.trip-range-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fms-space-3);
+  margin-bottom: var(--fms-space-3);
+}
+
+.trip-range-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.trip-range-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: var(--fms-radius-full);
+  border: 1px solid var(--fms-border);
+  background: var(--fms-card);
+  color: var(--fms-text-secondary);
+  font-size: var(--fms-text-small);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background var(--fms-duration-fast) var(--fms-ease), border-color var(--fms-duration-fast) var(--fms-ease), color var(--fms-duration-fast) var(--fms-ease);
+}
+.trip-range-pill:hover { background: var(--fms-card-hover); color: var(--fms-text-primary); }
+.trip-range-pill.active {
+  border-color: var(--fms-primary);
+  background: var(--fms-primary-soft);
+  color: var(--fms-primary);
+}
+
+.trip-custom-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.trip-custom-range input[type="date"] { width: auto; }
+
+/* ---------------- Refresh error banner (static, not map-overlaid) ---------------- */
+
+.trip-refresh-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fms-space-2);
+  margin-bottom: var(--fms-space-3);
+  padding: var(--fms-space-3) var(--fms-space-4);
+  border: 1px solid rgba(var(--fms-danger-rgb), 0.4);
+  border-radius: var(--fms-radius-md);
+  background: var(--fms-danger-soft);
+  color: var(--fms-text-primary);
+  font-size: var(--fms-text-small);
+}
+.trip-refresh-error .bi { color: var(--fms-danger); }
+
+/* ---------------- Table cells ---------------- */
+
+.trip-distance { font-variant-numeric: tabular-nums; }
+.trip-location {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fms-text-small);
+}
+
+/* ---------------- Map column: route thumbnail ---------------- */
+
+.trip-map-cell { width: 100px; }
+
+.trip-route-thumb-btn {
+  position: relative;
+  display: block;
+  width: 88px;
+  height: 50px;
+  padding: 0;
+  border: 1px solid var(--fms-border);
+  border-radius: var(--fms-radius-sm);
+  background: var(--fms-surface-2);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--fms-duration-fast) var(--fms-ease);
+}
+.trip-route-thumb-btn:hover,
+.trip-route-thumb-btn:focus-visible { border-color: var(--fms-primary); }
+.trip-route-thumb { display: block; width: 100%; height: 100%; }
+
+.trip-route-thumb-btn.is-loading .trip-route-thumb { visibility: hidden; }
+.trip-route-thumb-btn.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--fms-border);
+  border-top-color: var(--fms-primary);
+  animation: live-spin 0.8s linear infinite;
+}
+
+/* ---------------- Route modal ---------------- */
+
+.trip-route-modal-map { height: min(60vh, 520px); min-height: 320px; }
+.trip-route-modal-loading {
+  height: min(60vh, 520px);
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------------- Download Report menu (range bar) ---------------- */
+
+.trip-download { margin-left: auto; }
+.trip-download-btn { white-space: nowrap; }
+.trip-download-menu { min-width: 280px; padding: 6px; }
+.trip-download-menu .dropdown-header { white-space: normal; font-size: var(--fms-text-small); }
+.trip-download-menu .dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--fms-radius-sm);
+  white-space: normal;
+}
+.trip-download-menu .dropdown-item .bi { font-size: 1.25rem; line-height: 1; margin-top: 2px; }
+.trip-download-menu .dropdown-item span { display: flex; flex-direction: column; }
+.trip-download-menu .dropdown-item small { color: var(--fms-text-muted); font-size: var(--fms-text-small); }
+
+/* ---------------- Trip popup: map + details/analysis panel ---------------- */
+
+.trip-modal-heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trip-modal-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.trip-modal-layout { display: grid; grid-template-columns: 1fr; }
+.trip-modal-layout .trip-route-modal-map,
+.trip-modal-layout .trip-route-modal-loading { height: min(48vh, 440px); min-height: 280px; }
+
+.trip-modal-panel {
+  border-top: 1px solid var(--fms-border);
+  background: var(--fms-card);
+}
+.trip-panel-section { padding: var(--fms-space-3) var(--fms-space-4); }
+.trip-panel-section + .trip-panel-section { border-top: 1px solid var(--fms-border); }
+.trip-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 var(--fms-space-2);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--fms-text-primary);
+}
+.trip-panel-title .bi { color: var(--fms-primary); }
+.trip-panel-subtitle {
+  margin: var(--fms-space-3) 0 6px;
+  font-size: var(--fms-text-small);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fms-text-secondary);
+}
+.trip-panel-note { margin: var(--fms-space-3) 0 0; font-size: 11px; color: var(--fms-text-muted); }
+.trip-panel-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--fms-space-3) 0;
+  font-size: var(--fms-text-small);
+  color: var(--fms-text-muted);
+}
+.trip-panel-loading .map-loading-spinner { width: 20px; height: 20px; }
+
+.trip-detail-list {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: var(--fms-text-small);
+}
+.trip-detail-list dt { font-weight: 500; color: var(--fms-text-muted); }
+.trip-detail-list dd { margin: 0; color: var(--fms-text-primary); min-width: 0; overflow-wrap: anywhere; }
+.trip-location.is-wrapped { max-width: none; white-space: normal; text-align: left; }
+
+.trip-metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.trip-metric {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border: 1px solid var(--fms-border);
+  border-radius: var(--fms-radius-sm);
+  background: var(--fms-surface-2);
+  min-width: 0;
+}
+.trip-metric-label { font-size: 11px; color: var(--fms-text-muted); }
+.trip-metric-value { font-size: 0.95rem; font-weight: 700; color: var(--fms-text-primary); font-variant-numeric: tabular-nums; }
+.trip-metric-hint { font-size: 11px; color: var(--fms-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Moving / idle / engine-off split — fixed state colours (never re-assigned),
+   2px surface gaps between segments, and a labelled legend (not colour alone). */
+.trip-activity { margin-top: var(--fms-space-3); }
+.trip-activity-bar { display: flex; gap: 2px; height: 12px; border-radius: 4px; overflow: hidden; }
+.trip-activity-seg { flex-basis: 0; min-width: 3px; }
+.is-moving { background: var(--fms-primary); }
+.is-idle { background: #eb6834; }
+.is-engine-off { background: #94a3b8; }
+.is-no-data { background: var(--fms-border); }
+.trip-activity-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--fms-text-secondary);
+}
+.trip-activity-legend strong { color: var(--fms-text-primary); font-weight: 600; }
+.trip-activity-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; }
+
+.trip-stop-list { margin: 0; padding-left: 18px; font-size: var(--fms-text-small); }
+.trip-stop-list li + li { margin-top: 6px; }
+.trip-stop-place { color: var(--fms-text-secondary); font-size: 11px; overflow-wrap: anywhere; }
+
+.trip-insight-list { margin: 0; padding: 0; list-style: none; font-size: var(--fms-text-small); }
+.trip-insight-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--fms-border);
+}
+.trip-insight-list li span { color: var(--fms-text-secondary); }
+.trip-insight-list li strong { text-align: right; color: var(--fms-text-primary); }
+.trip-insight-list li small { grid-column: 1 / -1; color: var(--fms-text-muted); font-size: 11px; overflow-wrap: anywhere; }
+
+.trip-modal-footer { justify-content: space-between; gap: var(--fms-space-2); }
+.trip-modal-actions { display: flex; flex-wrap: wrap; gap: var(--fms-space-2); }
+
+/* Desktop: map left, details/analysis scroll beside it. */
+@media (min-width: 992px) {
+  .trip-modal-layout { grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); }
+  .trip-modal-layout .trip-route-modal-map,
+  .trip-modal-layout .trip-route-modal-loading { height: min(70vh, 600px); }
+  .trip-modal-panel {
+    border-top: 0;
+    border-left: 1px solid var(--fms-border);
+    max-height: min(70vh, 600px);
+    overflow-y: auto;
+  }
+}
+
+/* ---------------- Phones ---------------- */
+
+@media (max-width: 767.98px) {
+  .trip-range-pills { -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .trip-range-pills::-webkit-scrollbar { display: none; }
+  .trip-custom-range { width: 100%; }
+  .trip-custom-range input[type="date"] { flex: 1 1 0; min-width: 0; }
+  .trip-location { max-width: none; white-space: normal; text-align: right; }
+  .trip-route-modal-map, .trip-route-modal-loading { height: min(70vh, 420px); }
+  .trip-modal-layout .trip-route-modal-map,
+  .trip-modal-layout .trip-route-modal-loading { height: min(42vh, 340px); min-height: 240px; }
+  .trip-download { margin-left: 0; width: 100%; }
+  .trip-download-btn { width: 100%; }
+  .trip-download-menu { width: 100%; }
+  .trip-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trip-modal-footer > span { width: 100%; }
+  .trip-modal-actions { width: 100%; }
+  .trip-modal-actions > * { flex: 1 1 auto; }
+  .trip-modal-actions .btn { width: 100%; }
+
+  /* Stacked cards: the Map thumbnail becomes a full-width hero at the top of the
+     card instead of a labelled field — an #id selector so it wins over the
+     generic ":first-child = card header" rule in responsive.css regardless of
+     load order (this table's first column is Map, not the record's identity). */
+  #tripReportTable.is-stacked > tbody > tr > td.trip-map-cell {
+    display: block;
+    justify-content: unset;
+    padding: 0;
+    background: var(--fms-bg-elevated);
+    border-radius: var(--fms-radius-md) var(--fms-radius-md) 0 0;
+  }
+  #tripReportTable.is-stacked > tbody > tr > td.trip-map-cell::before { display: none; }
+  #tripReportTable.is-stacked > tbody > tr > td.trip-map-cell .trip-route-thumb-btn {
+    width: 100%;
+    height: 96px;
+    border: 0;
+    border-radius: var(--fms-radius-md) var(--fms-radius-md) 0 0;
+  }
+}
+
+/* ---------------- Odometer Report (shares everything above) ---------------- */
+
+/* Two independent sources, grouped by a coloured rule over their columns and
+   the matching legend in the page note — identity never by colour alone (every
+   header also names its source). */
+.odo-table thead th.odo-th { border-top: 3px solid transparent; white-space: nowrap; }
+.odo-table thead th.odo-th.is-device { border-top-color: var(--fms-primary); }
+.odo-table thead th.odo-th.is-gps { border-top-color: #eb6834; }
+.odo-th-group { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; color: var(--fms-text-muted); }
+.odo-legend { font-weight: 600; color: var(--fms-text-primary); }
+.odo-legend::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  margin: 0 5px 3px 0;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+.odo-legend.is-device::before { background: var(--fms-primary); }
+.odo-legend.is-gps::before { background: #eb6834; }
+
+.odo-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.odo-row.is-no_data td { color: var(--fms-text-muted); }
+
+.odo-notes { margin: 0; padding: 0; list-style: none; font-size: 11px; min-width: 200px; max-width: 320px; }
+.odo-notes li { display: flex; gap: 5px; line-height: 1.35; color: var(--fms-text-secondary); }
+.odo-notes li + li { margin-top: 3px; }
+.odo-notes li.is-warning .bi { color: var(--fms-warning); }
+.odo-notes li .bi { flex: 0 0 auto; margin-top: 1px; }
+
+@media (max-width: 767.98px) {
+  .odo-num { text-align: right; }
+  .odo-notes { min-width: 0; max-width: none; }
+  /* Card view: the header's group caption is part of each cell's label already. */
+  #odometerReportTable.is-stacked .odo-th-group { display: inline; }
+}
+
+/* ---------------- Location Data Report (reuses the report styles above) ---------------- */
+
+.loc-filter-card { padding: var(--fms-space-3) var(--fms-space-4); margin-bottom: var(--fms-space-3); }
+.loc-filter-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--fms-space-2) var(--fms-space-3); }
+.loc-filter-row + .loc-filter-row { margin-top: var(--fms-space-3); padding-top: var(--fms-space-3); border-top: 1px solid var(--fms-border); }
+.loc-filter-label { min-width: 64px; font-size: var(--fms-text-small); font-weight: 700; color: var(--fms-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.loc-vehicle-select { width: auto; min-width: 240px; }
+.loc-range-wrap { flex: 1 1 auto; min-width: 0; }
+.loc-range-wrap .trip-range-bar { margin-bottom: 0; }
+.loc-selection-line { margin: 0 0 var(--fms-space-2); }
+
+.loc-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fms-space-2);
+  margin-bottom: var(--fms-space-3);
+}
+.loc-metric-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--fms-space-3) var(--fms-space-4); }
+.loc-metric-groups .trip-panel-subtitle { margin-top: 0; }
+.loc-metric-groups .trip-metric-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.loc-quality-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+.loc-map { height: clamp(260px, 40vh, 440px); border-radius: var(--fms-radius-md); overflow: hidden; border: 1px solid var(--fms-border); }
+
+.loc-records-head { flex-wrap: wrap; gap: var(--fms-space-2); }
+.loc-records-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--fms-space-2); }
+.loc-page-size { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.loc-page-size select { width: auto; }
+
+/* Sortable headers: the whole header is the button; state also in aria-sort. */
+.loc-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.loc-sort .bi { font-size: 11px; opacity: 0.45; }
+.loc-sort.is-active { color: var(--fms-primary); }
+.loc-sort.is-active .bi { opacity: 1; }
+.loc-table td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.loc-flag { margin: 1px 0; white-space: nowrap; }
+.loc-row-flagged > td:first-child { box-shadow: inset 3px 0 0 var(--fms-warning); }
+.loc-action-cell { width: 1%; white-space: nowrap; }
+.loc-pagination { display: flex; justify-content: flex-end; padding: var(--fms-space-3) var(--fms-space-4); }
+.loc-pagination:empty { display: none; }
+
+@media (max-width: 991.98px) {
+  .loc-metric-groups { grid-template-columns: 1fr; }
+}
+@media (max-width: 767.98px) {
+  .loc-filter-label { min-width: 100%; }
+  .loc-vehicle-select { flex: 1 1 auto; min-width: 0; }
+  .loc-apply-btn { flex: 0 0 auto; }
+  .loc-pagination { justify-content: center; }
+  .loc-records-controls { width: 100%; justify-content: space-between; }
+}
+
+/* ---------------- Trip popup: route playback (static/js/route_playback.js) ---------------- */
+
+.trip-modal-mapcol { display: flex; flex-direction: column; min-width: 0; }
+.trip-playback {
+  display: flex;
+  align-items: center;
+  gap: var(--fms-space-2);
+  padding: var(--fms-space-2) var(--fms-space-3);
+  border-top: 1px solid var(--fms-border);
+  background: var(--fms-card);
+}
+.trip-playback-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 32px; padding: 0; font-size: 1.05rem; }
+.trip-playback-scrub { flex: 1 1 auto; min-width: 80px; }
+.trip-playback-clock { min-width: 64px; font-size: var(--fms-text-small); font-variant-numeric: tabular-nums; color: var(--fms-text-secondary); white-space: nowrap; }
+.trip-playback-speed { width: auto; min-width: 72px; flex: 0 0 auto; }
+.trip-playback-note { margin: 0; padding: 0 var(--fms-space-3) var(--fms-space-2); font-size: 11px; color: var(--fms-text-muted); }
+
+/* The moving vehicle: a white-ringed primary disc with a heading arrow. */
+.trip-playback-icon { background: none; border: 0; }
+.trip-playback-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--fms-primary);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
+  color: #fff;
+  font-size: 13px;
+  transition: transform 120ms linear;
+}
+.leaflet-tooltip.trip-map-label {
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--fms-radius-sm);
+}
+
+@media (max-width: 575.98px) {
+  .trip-playback { flex-wrap: wrap; }
+  .trip-playback-scrub { order: 5; flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trip-playback-marker { transition: none; }
+}
+
+/* ---------------- Alert Report (templates/alerts/alert_report.html) ---------------- */
+.alert-report-row { cursor: pointer; }
+.alert-filter-select { width: auto; min-width: 150px; }
+.alert-action-col { width: 1%; white-space: nowrap; }
+.alert-detail-btn { padding: 2px 8px; }
+.alert-report-row.is-new td:first-child { box-shadow: inset 3px 0 0 var(--fms-danger); }
+.alert-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.alert-detail-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: var(--fms-text-small, .85rem); }
+.alert-detail-list dt { color: var(--fms-text-muted); font-weight: 500; }
+.alert-detail-list dd { margin: 0; overflow-wrap: anywhere; }
+.alert-detail-map { height: 300px; border-radius: var(--fms-radius-md, 8px); border: 1px solid var(--fms-border); }
+@media (max-width: 767.98px) {
+  .alert-filter-select { flex: 1 1 0; min-width: 0; }
+  .alert-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .alert-detail-map { height: 220px; }
+}
+.alert-report-table .trip-location { max-width: 150px; }
+.table.alert-report-table > :not(caption) > * > * { padding-left: 10px; padding-right: 10px; }

@@ -1,0 +1,33 @@
+{% load fms_extras %}
+    {% if can_view_trip %}
+      <div class="table-card">
+        <div class="table-card-header">
+          <span class="section-title">Recent Trips</span>
+          <a href="/trips/" class="btn btn-sm btn-outline-secondary">View All</a>
+        </div>
+        {% if recent_trips_error %}
+          <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load trip data.</div>
+        {% elif recent_trips %}
+          <div class="table-responsive-fms">
+            <table class="table">
+              <thead><tr><th>Trip</th><th>Client</th><th>Vehicle</th><th>Driver</th><th>Route</th><th>Status</th><th>Time</th></tr></thead>
+              <tbody>
+                {% for trip in recent_trips %}
+                  <tr>
+                    <td><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}">{{ trip.trip_number }}</a></td>
+                    <td class="cell-secondary">{{ trip.client.client_name }}</td>
+                    <td class="cell-secondary">{% if trip.vehicle %}{{ trip.vehicle.registration_number }}{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{% if trip.driver %}{{ trip.driver.get_full_name }}{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{{ trip.route_label }}</td>
+                    <td>{% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}</td>
+                    <td class="cell-secondary">{{ trip.created_at|date:"M d, H:i" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No trips yet" message="Your fleet's trip history — vehicle, driver, client, route, and status — will appear here." %}
+        {% endif %}
+      </div>
+    {% endif %}

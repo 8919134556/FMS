@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Vehicle Type{% else %}New Vehicle Type{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'vehicles:vehicle_type_list' %}">Vehicle Types</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.name }}{% else %}New Vehicle Type{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="tags" title="Vehicle Type" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.code.label }}</label>
+          {{ form.code }}
+          {% if form.code.errors %}<div class="invalid-feedback d-block">{{ form.code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.category.label }}</label>
+          {{ form.category }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description }}
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% url 'vehicles:vehicle_type_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Vehicle Type…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Vehicle Type{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

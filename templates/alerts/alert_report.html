@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Alert Report · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}
+  {# Same look as the other reports: Live Tracking header/pills + Trip Report range bar. #}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <link rel="stylesheet" href="{% static 'css/live_tracking.css' %}">
+  <link rel="stylesheet" href="{% static 'css/trip_report.css' %}">
+{% endblock %}
+{% block content %}
+  {# No alert data is rendered server-side — the JS pages it from the RBAC'd, client-scoped API. #}
+  <div id="alertReportRoot"
+       data-report-url="{% url 'alert-report-data' %}"
+       data-export-url="{% url 'alert-report-export' %}"
+       data-detail-url-template="{% url 'alert-detail-api' uuid='00000000-0000-0000-0000-000000000000' %}"
+       data-ack-url-template="{% url 'alerts:alert_acknowledge' uuid='00000000-0000-0000-0000-000000000000' %}"
+       data-resolve-url-template="{% url 'alerts:alert_resolve' uuid='00000000-0000-0000-0000-000000000000' %}"
+       data-max-custom-days="{{ max_custom_range_days }}"
+       data-timezone="{{ display_timezone }}">
+
+    <div class="breadcrumb-fms"><span>Reports</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Alert Report</span></div>
+
+    {% include "tracking/_report_header.html" with prefix="alr" title="Alert Report" icon="bell" %}
+
+    <p class="text-small text-muted-fms trip-report-note">
+      <i class="bi bi-info-circle me-1"></i><span>Each row is one alert event — the same event the notification bell announced.
+      A panic signal that stays on across many readings is a single alert; an Idle alert is raised once the ignition has been ON
+      with the vehicle stationary for its idle threshold (default 5 min), and its duration runs until it moves or the ignition goes off. New alerts
+      also appear here automatically.{% if not request.user.client_id %} Trip, maintenance and document alerts are handled in the
+      <a href="{% url 'alerts:alert_list' %}">Alerts work list</a>.{% endif %}</span>
+    </p>
+
+    {% include "tracking/_report_range_bar.html" with prefix="alr" pdf_hint="Header, filter summary & alert table" xlsx_hint="Summary & every alert with full details" %}
+
+    <div class="dashboard-kpi-grid is-dense mb-3">
+      {% include "components/kpi_card.html" with label="Alerts" value="—" value_id="alrKpiTotal" icon="bell" tone="primary" %}
+      {% include "components/kpi_card.html" with label="New" value="—" value_id="alrKpiOpen" icon="exclamation-octagon" tone="danger" %}
+      {% include "components/kpi_card.html" with label="Acknowledged" value="—" value_id="alrKpiAck" icon="eye" tone="warning" %}
+      {% include "components/kpi_card.html" with label="Resolved" value="—" value_id="alrKpiResolved" icon="check-circle" tone="success" %}
+    </div>
+
+    <div class="live-status-bar">
+      <div class="live-status-pills" id="alrStatusPills" role="tablist" aria-label="Filter by alert status"></div>
+      <div class="live-status-controls">
+        <select id="alrTypeFilter" class="form-select form-select-sm alert-filter-select" aria-label="Alert type">
+          <option value="">All Alerts</option>
+          {% for value, label in alert_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+        <select id="alrSeverityFilter" class="form-select form-select-sm alert-filter-select" aria-label="Severity">
+          <option value="">All Severities</option>
+          {% for value, label in severities %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+        <select id="alrVehicleFilter" class="form-select form-select-sm alert-filter-select" aria-label="Vehicle">
+          <option value="">All Vehicles</option>
+          {% for vehicle in vehicles %}<option value="{{ vehicle.uuid }}">{{ vehicle.registration_number }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="trip-refresh-error d-none" id="alrRefreshError">
+      <i class="bi bi-exclamation-triangle me-1"></i><span id="alrRefreshErrorText">Unable to refresh alerts</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="alrRefreshRetryBtn">Retry</button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header loc-records-head">
+        <div class="table-card-title">
+          <span class="section-title">Alerts</span>
+          <span class="text-small text-muted-fms ms-2" id="alrTableCount">Loading…</span>
+        </div>
+        <label class="loc-page-size" for="alrPageSize">
+          <span class="text-small text-muted-fms">Rows</span>
+          <select id="alrPageSize" class="form-select form-select-sm">
+            {% for size in page_sizes %}<option value="{{ size }}"{% if size == 50 %} selected{% endif %}>{{ size }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="table-responsive-fms">
+        <table class="table alert-report-table" id="alrTable">
+          <thead><tr id="alrHeadRow"></tr></thead>
+          <tbody id="alrTableBody">
+            {% include "components/loading.html" with rows=5 cols=9 %}
+          </tbody>
+        </table>
+      </div>
+      <div class="d-none" id="alrEmpty">
+        {% include "components/empty_state.html" with icon="bell-slash" title="No alerts" message="No alerts match the selected vehicle, alert type, severity and period." %}
+      </div>
+      <nav class="loc-pagination" id="alrPagination" aria-label="Alert pages"></nav>
+    </div>
+  </div>
+
+  {# Alert details: one shared modal, filled from the row (or from /api/v1/alerts/<uuid>/ for a notification link). #}
+  <div class="modal fade" id="alrDetailModal" tabindex="-1" aria-hidden="true" aria-labelledby="alrDetailTitle">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title h5 mb-0" id="alrDetailTitle">Alert Details</h2>
+            <div class="text-small text-muted-fms" id="alrDetailSubtitle"></div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert-detail-grid">
+            <dl class="alert-detail-list" id="alrDetailList"></dl>
+            <div>
+              <div id="alrDetailMap" class="alert-detail-map"></div>
+              <p class="text-small text-muted-fms mb-0 mt-2" id="alrDetailMapNote"></p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span class="text-small text-muted-fms me-auto" id="alrDetailWorkflow"></span>
+          {% if can_update %}
+            <button type="button" class="btn btn-sm btn-outline-warning d-none" id="alrAckBtn"><i class="bi bi-eye me-1"></i>Acknowledge</button>
+            <button type="button" class="btn btn-sm btn-success d-none" id="alrResolveBtn"><i class="bi bi-check2-circle me-1"></i>Resolve</button>
+          {% endif %}
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'js/fms_format.js' %}"></script>
+  <script src="{% static 'js/fms_map.js' %}"></script>
+  <script src="{% static 'js/auto_refresh.js' %}"></script>
+  <script src="{% static 'js/report_common.js' %}"></script>
+  <script src="{% static 'js/alert_report.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Documents · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "document" "create" as can_create %}
+
+  <div class="breadcrumb-fms"><span>Documents</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>All Documents</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Documents</h1>
+      <p class="page-subtitle">Manage fleet, client and operational documents.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Documents" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="Upload Document" can_create=can_create %}
+
+    {% if documents %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Document</th>
+              <th>Type</th>
+              <th>Related To</th>
+              <th>Issue Date</th>
+              <th>Expiry</th>
+              <th>Uploaded By</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for doc in documents %}
+              <tr>
+                <td>
+                  <a href="{% url 'documents:document_detail' uuid=doc.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+                      <i class="bi bi-file-earmark-text"></i>
+                    </span>
+                    <span>
+                      <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ doc.title }}</div>
+                      <div class="cell-secondary">{{ doc.document_number }} &middot; {{ doc.original_filename }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">{{ doc.get_document_type_display }}</td>
+                <td class="cell-secondary">
+                  {% if doc.content_object %}{{ doc.content_type.name|title }}: {{ doc.content_object }}{% else %}—{% endif %}
+                </td>
+                <td class="cell-secondary">{{ doc.issue_date|default:"—" }}</td>
+                <td class="cell-secondary">
+                  {% if doc.expiry_status == "EXPIRED" %}
+                    {% include "components/status_badge.html" with status="EXPIRED" label=doc.expiry_label %}
+                  {% elif doc.expiry_status == "EXPIRING_SOON" %}
+                    {% include "components/status_badge.html" with status="EXPIRING_SOON" label=doc.expiry_label %}
+                  {% elif doc.expiry_status == "VALID" %}
+                    {{ doc.expiry_date }}
+                  {% else %}
+                    Never
+                  {% endif %}
+                </td>
+                <td class="cell-secondary">{{ doc.created_by.get_full_name|default:"—" }}</td>
+                <td>{% include "components/status_badge.html" with status=doc.status label=doc.get_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'documents:document_detail' uuid=doc.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      <li><a class="dropdown-item" href="{% url 'documents:document_download' uuid=doc.uuid %}"><i class="bi bi-download"></i>Download</a></li>
+                      {% has_module_perm request.user "document" "update" as can_update %}
+                      {% if can_update %}
+                        <li><a class="dropdown-item" href="{% url 'documents:document_edit' uuid=doc.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% has_module_perm request.user "document" "archive" as can_archive %}
+                      {% if can_archive %}
+                        <li><hr class="dropdown-divider"></li>
+                        {% if doc.status == "ACTIVE" %}
+                          <li><form method="post" action="{% url 'documents:document_archive' uuid=doc.uuid %}" data-confirm="Archive {{ doc.title }}?">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-archive"></i>Archive</button></form></li>
+                        {% else %}
+                          <li><form method="post" action="{% url 'documents:document_restore' uuid=doc.uuid %}">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-arrow-counterclockwise"></i>Restore</button></form></li>
+                        {% endif %}
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.document_type or current_filters.entity_type or current_filters.status or current_filters.expiry or current_filters.uploaded_by or current_filters.date_from or current_filters.date_to %}
+        {% include "components/empty_state.html" with icon="funnel" title="No documents match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="file-earmark-text" title="No documents yet" message="Upload your first document to start managing FMS records." action_url=create_url action_label="Upload Document" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

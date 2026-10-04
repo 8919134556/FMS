@@ -1,0 +1,105 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fms_db}
+      POSTGRES_USER: ${POSTGRES_USER:-fms_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fms_password}
+    volumes:
+      - fms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fms_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    volumes:
+      - .:/app
+      - fms_media:/app/media
+      - fms_static:/app/staticfiles
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  celery-worker:
+    build: .
+    restart: unless-stopped
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - .:/app
+      - fms_media:/app/media
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build: .
+    restart: unless-stopped
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Phase 3.5 — standalone asyncio TCP service for GPS/telematics devices.
+  # Independent of the web app's request/response lifecycle; coordinates
+  # with it only through PostgreSQL (DeviceCommand queue + telemetry
+  # tables), never Redis/Celery. Exposes TELEMATICS_TCP_PORT (generic
+  # NDJSON protocol) and TELEMATICS_TELTONIKA_TCP_PORT (real Teltonika
+  # Codec 8/12 protocol, Phase 3.6) for devices to connect to directly
+  # (not proxied through gunicorn).
+  telematics-server:
+    build: .
+    restart: unless-stopped
+    command: python manage.py run_telematics_server
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  fms_postgres_data:
+  fms_media:
+  fms_static:

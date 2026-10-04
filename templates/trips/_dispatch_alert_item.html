@@ -1,0 +1,9 @@
+{% comment %}Usage: {% include "trips/_dispatch_alert_item.html" with item=item %}{% endcomment %}
+<div class="attention-item sev-{{ item.severity }}">
+  <span class="attention-icon"><i class="bi bi-{{ item.icon }}"></i></span>
+  <div class="attention-body">
+    <div class="attention-title">{{ item.title }}</div>
+    <div class="attention-desc">{{ item.description }}</div>
+  </div>
+  <a href="{{ item.url }}" class="attention-action btn btn-sm btn-outline-secondary">View</a>
+</div>

@@ -1,0 +1,75 @@
+{% load fms_extras %}
+{% comment %}
+Reusable entity-scoped Documents tab — included (not duplicated) from every
+entity detail page's Documents tab: Vehicle, Driver, Client, Site, Trip,
+Maintenance.
+
+Usage:
+  {% include "components/document_tab.html" with documents=vehicle_documents entity_type="vehicle" object_id=vehicle.id %}
+{% endcomment %}
+{% has_module_perm request.user "document" "create" as can_create_document %}
+{% has_module_perm request.user "document" "archive" as can_archive_document %}
+<div class="card-fms">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="section-title" style="font-size:.95rem;">Documents{% if documents %} ({{ documents|length }}){% endif %}</span>
+    {% if can_create_document %}
+      <a href="{% url 'documents:document_create' %}?entity_type={{ entity_type }}&object_id={{ object_id }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-file-earmark-arrow-up me-1"></i>Add Document
+      </a>
+    {% endif %}
+  </div>
+  {% if documents %}
+    <div class="table-responsive-fms">
+      <table class="table">
+        <thead><tr><th>Document</th><th>Type</th><th>Issue Date</th><th>Expiry</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          {% for doc in documents %}
+            <tr>
+              <td>
+                <a href="{% url 'documents:document_detail' uuid=doc.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                  <i class="bi bi-file-earmark-text"></i>
+                  <span>
+                    <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ doc.title }}</div>
+                    <div class="cell-secondary">{{ doc.document_number }}</div>
+                  </span>
+                </a>
+              </td>
+              <td class="cell-secondary">{{ doc.get_document_type_display }}</td>
+              <td class="cell-secondary">{{ doc.issue_date|default:"—" }}</td>
+              <td class="cell-secondary">
+                {% if doc.expiry_status == "EXPIRED" %}
+                  {% include "components/status_badge.html" with status="EXPIRED" label=doc.expiry_label %}
+                {% elif doc.expiry_status == "EXPIRING_SOON" %}
+                  {% include "components/status_badge.html" with status="EXPIRING_SOON" label=doc.expiry_label %}
+                {% elif doc.expiry_status == "VALID" %}
+                  {{ doc.expiry_date }}
+                {% else %}
+                  Never
+                {% endif %}
+              </td>
+              <td>{% include "components/status_badge.html" with status=doc.status label=doc.get_status_display %}</td>
+              <td class="text-end">
+                <div class="dropdown">
+                  <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'documents:document_detail' uuid=doc.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                    <li><a class="dropdown-item" href="{% url 'documents:document_download' uuid=doc.uuid %}"><i class="bi bi-download"></i>Download</a></li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon"><i class="bi bi-file-earmark-text"></i></div>
+      <h4>No documents yet</h4>
+      <p>Upload insurance, registration, or service documents for this record.</p>
+      {% if can_create_document %}
+        <a href="{% url 'documents:document_create' %}?entity_type={{ entity_type }}&object_id={{ object_id }}" class="btn btn-primary btn-sm">Add Document</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

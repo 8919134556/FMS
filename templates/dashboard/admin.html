@@ -1,0 +1,115 @@
+{% extends "dashboard/_base.html" %}
+{% load fms_extras %}
+{% block dashboard_title %}Fleet Operations{% endblock %}
+{% block dashboard_body %}
+  {% include "dashboard/partials/_hero.html" with eyebrow="Admin Dashboard" title="Fleet Operations" subtitle="Real-time overview of your fleet, your team and today's activity." %}
+
+  {% include "dashboard/partials/_kpi_strip.html" %}
+
+  {% comment %}============ Trends: trips over time + trip status mix ============{% endcomment %}
+  {% if can_view_trip %}
+    <div class="dashboard-row cols-2-wide">
+      <div class="card-fms chart-card dash-panel">
+        <div class="dash-panel-header">
+          <div>
+            <span class="section-title" style="font-size:.95rem;">Trips — Last 7 Days</span>
+            <p class="text-small text-muted-fms mb-0">Scheduled vs. completed, per day</p>
+          </div>
+          <a href="/trips/" class="btn btn-sm btn-outline-secondary">All Trips</a>
+        </div>
+        <div class="chart-box"><canvas id="tripTrendChart"></canvas></div>
+      </div>
+      <div class="card-fms chart-card dash-panel">
+        <div class="dash-panel-header">
+          <div>
+            <span class="section-title" style="font-size:.95rem;">{{ date_range_label }}'s Trips by Status</span>
+            <p class="text-small text-muted-fms mb-0">Trips scheduled to start in this period</p>
+          </div>
+        </div>
+        {% if trip_status_summary.total %}
+          <div class="chart-box"><canvas id="tripStatusChart"></canvas></div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="calendar-x" title="No trips scheduled" message="No trips are scheduled for this period." %}
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% comment %}============ Needs attention | Notifications ============{% endcomment %}
+  <div class="dashboard-row cols-2-wide">
+    {% include "dashboard/partials/_attention.html" %}
+    {% include "dashboard/partials/_notifications.html" %}
+  </div>
+
+  {% comment %}============ Quick actions ============{% endcomment %}
+  {% include "dashboard/partials/_quick_actions.html" %}
+
+  {% comment %}============ Fleet / accounts snapshot ============{% endcomment %}
+  <div class="dashboard-row cols-3">
+    {% if can_view_vehicle %}
+      <div class="card-fms chart-card dash-panel">
+        <div class="dash-panel-header"><span class="section-title" style="font-size:.95rem;">Fleet Status</span></div>
+        {% if total_vehicles %}
+          <div class="chart-box is-short"><canvas id="fleetLifecycleChart"></canvas></div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="truck-front" title="No vehicles yet" message="Add your first vehicle to see the fleet status breakdown." %}
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if can_view_role %}
+      <div class="card-fms chart-card dash-panel">
+        <div class="dash-panel-header">
+          <span class="section-title" style="font-size:.95rem;">Users by Role</span>
+          <a href="{% url 'accounts_portal:role_list' %}" class="btn btn-sm btn-outline-secondary">{{ total_roles }} role{{ total_roles|pluralize }}</a>
+        </div>
+        <div class="chart-box is-short"><canvas id="usersByRoleChart"></canvas></div>
+      </div>
+    {% endif %}
+    {% if can_view_user %}
+      <div class="card-fms chart-card dash-panel">
+        <div class="dash-panel-header">
+          <span class="section-title" style="font-size:.95rem;">Accounts</span>
+          <a href="{% url 'accounts_portal:user_list' %}" class="btn btn-sm btn-outline-secondary">{{ total_users }} user{{ total_users|pluralize }}</a>
+        </div>
+        <div class="chart-box is-short"><canvas id="usersByStatusChart"></canvas></div>
+        <div class="stat-row-list mt-2">
+          <a href="{% url 'accounts_portal:user_list' %}?status=LOCKED" class="stat-row"><span class="cell-secondary">Locked</span><span class="stat-row-value">{{ locked_users }}</span></a>
+          <a href="{% url 'accounts_portal:user_list' %}?status=SUSPENDED" class="stat-row"><span class="cell-secondary">Suspended</span><span class="stat-row-value">{{ suspended_users }}</span></a>
+          <a href="{% url 'accounts_portal:user_list' %}?status=INVITED" class="stat-row"><span class="cell-secondary">Pending invitations</span><span class="stat-row-value">{{ invited_users }}</span></a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% comment %}============ Portal activity trend (audit viewers only) ============{% endcomment %}
+  {% if can_view_audit %}
+    <div class="card-fms chart-card dash-panel mt-4">
+      <div class="dash-panel-header">
+        <div>
+          <span class="section-title" style="font-size:.95rem;">Portal Activity</span>
+          <p class="text-small text-muted-fms mb-0">Audited actions &amp; logins over the last {{ activity_range }} days &middot; {{ audit_today_count }} event{{ audit_today_count|pluralize }} today</p>
+        </div>
+        <div class="range-toggle">
+          <a href="?range=7" class="{% if activity_range == 7 %}active{% endif %}">7d</a>
+          <a href="?range=30" class="{% if activity_range == 30 %}active{% endif %}">30d</a>
+          <a href="?range=90" class="{% if activity_range == 90 %}active{% endif %}">90d</a>
+        </div>
+      </div>
+      <div class="chart-box"><canvas id="activityTrendChart"></canvas></div>
+    </div>
+  {% endif %}
+
+  {% comment %}============ Operations: every widget below is permission-gated ============{% endcomment %}
+  {% include "dashboard/partials/_connectivity.html" %}
+  {% include "dashboard/partials/_todays_ops.html" %}
+  {% include "dashboard/partials/_active_trips.html" %}
+  {% include "dashboard/partials/_availability.html" %}
+  {% include "dashboard/partials/_maintenance.html" %}
+  {% include "dashboard/partials/_documents.html" %}
+  {% include "dashboard/partials/_clients_sites.html" %}
+
+  <div class="dashboard-row cols-2">
+    {% include "dashboard/partials/_recent_trips.html" %}
+    {% include "dashboard/partials/_activity.html" %}
+  </div>
+{% endblock %}

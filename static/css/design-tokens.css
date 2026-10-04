@@ -1,0 +1,238 @@
+/*
+ * FMS Design Tokens — dual theme (light default, dark opt-in)
+ * Single source of truth for color, type, spacing, radius, shadow, motion.
+ *
+ * Theme resolution (3 states, no page reload):
+ *   1. No explicit choice + OS light (or no preference) -> :root (light) applies.
+ *   2. No explicit choice + OS dark -> the prefers-color-scheme block below applies.
+ *   3. Explicit choice -> <html data-theme="light|dark"> stamped by static/js/theme.js,
+ *      which always wins (see :root[data-theme="..."] blocks, loaded last).
+ *
+ * Every other stylesheet (app.css, components.css, dashboard.css) consumes
+ * these variables only — no raw hex codes anywhere else in the codebase.
+ */
+
+:root {
+  /* ---------- Surfaces (light) ---------- */
+  --fms-bg: #f6f8fc;
+  --fms-bg-elevated: #ffffff;
+  --fms-sidebar: #ffffff;
+  --fms-card: #ffffff;
+  --fms-card-hover: #f8fafc;
+  --fms-surface-2: #eef2f8;
+  --fms-border: #e2e8f0;
+  --fms-border-strong: #cbd5e1;
+
+  /* ---------- Text (light) ---------- */
+  --fms-text-primary: #0f172a;
+  --fms-text-secondary: #475569;
+  --fms-text-muted: #64748b;
+  --fms-text-on-accent: #ffffff;
+
+  /* ---------- Brand / semantic (light) ---------- */
+  --fms-primary: #2563eb;
+  --fms-primary-rgb: 37, 99, 235;
+  --fms-primary-hover: #1d4ed8;
+  --fms-primary-soft: rgba(37, 99, 235, 0.1);
+
+  --fms-success: #16a34a;
+  --fms-success-rgb: 22, 163, 74;
+  --fms-success-soft: rgba(22, 163, 74, 0.12);
+
+  --fms-warning: #d97706;
+  --fms-warning-rgb: 217, 119, 6;
+  --fms-warning-soft: rgba(217, 119, 6, 0.12);
+
+  --fms-danger: #dc2626;
+  --fms-danger-rgb: 220, 38, 38;
+  --fms-danger-soft: rgba(220, 38, 38, 0.1);
+
+  --fms-info: #0891b2;
+  --fms-info-rgb: 8, 145, 178;
+  --fms-info-soft: rgba(8, 145, 178, 0.1);
+
+  --fms-purple: #7c3aed;
+  --fms-purple-rgb: 124, 58, 237;
+  --fms-purple-soft: rgba(124, 58, 237, 0.1);
+
+  --fms-neutral-soft: rgba(100, 116, 139, 0.1);
+
+  /* Translucent glass surfaces (topbar, sticky form-action bar) */
+  --fms-glass-bg: rgba(255, 255, 255, 0.82);
+
+  /* ---------- Shadows (light — soft, low elevation) ---------- */
+  --fms-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --fms-shadow-md: 0 6px 20px rgba(15, 23, 42, 0.07);
+  --fms-shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.1);
+  --fms-shadow-focus: 0 0 0 3px rgba(var(--fms-primary-rgb), 0.22);
+
+  /* ---------- Typography ---------- */
+  --fms-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --fms-font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+  --fms-text-page-title: 1.75rem;   /* 28px */
+  --fms-text-section-title: 1.125rem; /* 18px */
+  --fms-text-metric: 2rem;          /* 32px */
+  --fms-text-body: 0.8125rem;       /* 13px */
+  --fms-text-body-lg: 0.875rem;     /* 14px */
+  --fms-text-small: 0.75rem;        /* 12px */
+  --fms-text-tiny: 0.6875rem;       /* 11px */
+
+  /* ---------- Spacing scale ---------- */
+  --fms-space-1: 4px;
+  --fms-space-2: 8px;
+  --fms-space-3: 12px;
+  --fms-space-4: 16px;
+  --fms-space-5: 20px;
+  --fms-space-6: 24px;
+  --fms-space-8: 32px;
+  --fms-space-10: 40px;
+
+  /* ---------- Radius ---------- */
+  --fms-radius-sm: 6px;
+  --fms-radius-md: 10px;
+  --fms-radius-lg: 14px;
+  --fms-radius-full: 999px;
+
+  /* ---------- Motion ---------- */
+  --fms-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --fms-duration-fast: 120ms;
+  --fms-duration-base: 180ms;
+  --fms-duration-slow: 280ms;
+
+  /* ---------- Layout ---------- */
+  --fms-sidebar-width: 252px;
+  --fms-sidebar-width-collapsed: 76px;
+  --fms-topbar-height: 60px;
+  --fms-content-max: 1480px;
+  --fms-z-sidebar: 1030;
+  --fms-z-topbar: 1020;
+  --fms-z-dropdown: 1050;
+  --fms-z-modal: 1060;
+  --fms-z-toast: 1080;
+
+  /* ---------- Bootstrap remap (keeps native BS components on-brand) ---------- */
+  --bs-body-bg: var(--fms-bg);
+  --bs-body-color: var(--fms-text-primary);
+  --bs-emphasis-color: var(--fms-text-primary);
+  --bs-secondary-color: var(--fms-text-secondary);
+  --bs-border-color: var(--fms-border);
+  --bs-border-color-translucent: var(--fms-border);
+  --bs-link-color: var(--fms-primary);
+  --bs-link-hover-color: var(--fms-primary-hover);
+  --bs-primary: var(--fms-primary);
+  --bs-primary-rgb: var(--fms-primary-rgb);
+  --bs-success: var(--fms-success);
+  --bs-success-rgb: var(--fms-success-rgb);
+  --bs-warning: var(--fms-warning);
+  --bs-warning-rgb: var(--fms-warning-rgb);
+  --bs-danger: var(--fms-danger);
+  --bs-danger-rgb: var(--fms-danger-rgb);
+  --bs-info: var(--fms-info);
+  --bs-info-rgb: var(--fms-info-rgb);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Dark theme — system preference (only when the user hasn't explicitly   */
+/* chosen "Light") ...                                                    */
+/* ---------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fms-bg: #0b1220;
+    --fms-bg-elevated: #172033;
+    --fms-sidebar: #0f172a;
+    --fms-card: #111827;
+    --fms-card-hover: #172033;
+    --fms-surface-2: #172033;
+    --fms-border: #263247;
+    --fms-border-strong: #34455f;
+
+    --fms-text-primary: #f8fafc;
+    --fms-text-secondary: #94a3b8;
+    --fms-text-muted: #6b7d99;
+
+    --fms-primary: #3b82f6;
+    --fms-primary-rgb: 59, 130, 246;
+    --fms-primary-hover: #5b95f7;
+    --fms-primary-soft: rgba(59, 130, 246, 0.14);
+
+    --fms-success: #22c55e;
+    --fms-success-rgb: 34, 197, 94;
+    --fms-success-soft: rgba(34, 197, 94, 0.14);
+
+    --fms-warning: #f59e0b;
+    --fms-warning-rgb: 245, 158, 11;
+    --fms-warning-soft: rgba(245, 158, 11, 0.14);
+
+    --fms-danger: #ef4444;
+    --fms-danger-rgb: 239, 68, 68;
+    --fms-danger-soft: rgba(239, 68, 68, 0.14);
+
+    --fms-info: #06b6d4;
+    --fms-info-rgb: 6, 182, 212;
+    --fms-info-soft: rgba(6, 182, 212, 0.14);
+
+    --fms-purple: #8b5cf6;
+    --fms-purple-rgb: 139, 92, 246;
+    --fms-purple-soft: rgba(139, 92, 246, 0.14);
+
+    --fms-neutral-soft: rgba(154, 171, 196, 0.14);
+    --fms-glass-bg: rgba(11, 18, 32, 0.86);
+
+    --fms-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --fms-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.32);
+    --fms-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Dark theme — explicit user choice (always wins, either direction)      */
+/* ---------------------------------------------------------------------- */
+
+:root[data-theme="dark"] {
+  --fms-bg: #0b1220;
+  --fms-bg-elevated: #172033;
+  --fms-sidebar: #0f172a;
+  --fms-card: #111827;
+  --fms-card-hover: #172033;
+  --fms-surface-2: #172033;
+  --fms-border: #263247;
+  --fms-border-strong: #34455f;
+
+  --fms-text-primary: #f8fafc;
+  --fms-text-secondary: #94a3b8;
+  --fms-text-muted: #6b7d99;
+
+  --fms-primary: #3b82f6;
+  --fms-primary-rgb: 59, 130, 246;
+  --fms-primary-hover: #5b95f7;
+  --fms-primary-soft: rgba(59, 130, 246, 0.14);
+
+  --fms-success: #22c55e;
+  --fms-success-rgb: 34, 197, 94;
+  --fms-success-soft: rgba(34, 197, 94, 0.14);
+
+  --fms-warning: #f59e0b;
+  --fms-warning-rgb: 245, 158, 11;
+  --fms-warning-soft: rgba(245, 158, 11, 0.14);
+
+  --fms-danger: #ef4444;
+  --fms-danger-rgb: 239, 68, 68;
+  --fms-danger-soft: rgba(239, 68, 68, 0.14);
+
+  --fms-info: #06b6d4;
+  --fms-info-rgb: 6, 182, 212;
+  --fms-info-soft: rgba(6, 182, 212, 0.14);
+
+  --fms-purple: #8b5cf6;
+  --fms-purple-rgb: 139, 92, 246;
+  --fms-purple-soft: rgba(139, 92, 246, 0.14);
+
+  --fms-neutral-soft: rgba(154, 171, 196, 0.14);
+  --fms-glass-bg: rgba(11, 18, 32, 0.86);
+
+  --fms-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --fms-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --fms-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+}

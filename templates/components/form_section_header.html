@@ -1,0 +1,8 @@
+{% comment %}
+Usage inside a <div class="form-section">:
+  {% include "components/form_section_header.html" with icon="upc-scan" title="Vehicle Identification" %}
+{% endcomment %}
+<div class="form-section-header">
+  {% if icon %}<i class="bi bi-{{ icon }}"></i>{% endif %}
+  <h3>{{ title }}</h3>
+</div>

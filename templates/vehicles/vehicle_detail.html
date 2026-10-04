@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}{{ vehicle.registration_number }} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "vehicle" "update" as can_update %}
+  {% has_module_perm request.user "vehicle" "archive" as can_archive %}
+  {% has_module_perm request.user "assignment" "create" as can_assign %}
+  {% has_module_perm request.user "assignment" "update" as can_unassign %}
+
+  <div class="breadcrumb-fms">
+    <a href="{% url 'vehicles:vehicle_list' %}">Vehicles</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ vehicle.registration_number }}</span>
+  </div>
+
+  <div class="detail-header card-fms mb-3 d-flex flex-wrap align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      {% if vehicle.image %}
+        <img src="{{ vehicle.image.url }}" alt="" style="width:64px;height:64px;border-radius:12px;object-fit:cover;">
+      {% else %}
+        <span class="avatar-chip" style="width:64px;height:64px;border-radius:12px;font-size:22px;background:linear-gradient(135deg, var(--fms-primary), var(--fms-info));">
+          <i class="bi bi-truck-front"></i>
+        </span>
+      {% endif %}
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="page-title mb-0">{{ vehicle.registration_number }}</h1>
+          {% include "components/status_badge.html" with status=vehicle.status label=vehicle.get_status_display %}
+          {% include "components/status_badge.html" with status=vehicle.availability_status label=vehicle.get_availability_status_display %}
+          {% if maintenance_due %}
+            {% include "components/status_badge.html" with status="OVERDUE" label="Maintenance Due" %}
+          {% endif %}
+        </div>
+        <p class="page-subtitle mb-0">
+          {{ vehicle.make }} {{ vehicle.model }}{% if vehicle.variant %} &middot; {{ vehicle.variant }}{% endif %} &middot; {{ vehicle.vehicle_code }}
+          {% if vehicle.client %} &middot; <a href="#">{{ vehicle.client.client_name }}</a>{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if can_update %}
+        <a href="{% url 'vehicles:vehicle_edit' uuid=vehicle.uuid %}" class="btn btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+      {% endif %}
+      {% if can_archive %}
+        {% if vehicle.status == "ACTIVE" %}
+          <form method="post" action="{% url 'vehicles:vehicle_deactivate' uuid=vehicle.uuid %}" data-confirm="Deactivate {{ vehicle.registration_number }}?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-slash-circle me-1"></i>Deactivate</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'vehicles:vehicle_activate' uuid=vehicle.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Activate</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% include "components/tabs.html" with tabs=tab_list active=active_tab %}
+
+  <div class="mt-3">
+    {% if active_tab == "driver" %}
+      <div class="row g-3">
+        <div class="col-lg-7">
+          <div class="card-fms">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="section-title" style="font-size:.95rem;">Current Assignment</span>
+              {% if can_assign %}
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assignDriverModal">
+                  <i class="bi bi-person-check me-1"></i>Assign Driver
+                </button>
+              {% endif %}
+            </div>
+            {% if vehicle.current_driver %}
+              <div class="d-flex align-items-center justify-content-between p-3" style="border:1px solid var(--fms-border); border-radius:10px;">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="avatar-chip" style="width:38px;height:38px;border-radius:8px;font-size:12px;">
+                    <i class="bi bi-person"></i>
+                  </span>
+                  <div>
+                    <a href="{% url 'drivers:driver_detail' uuid=vehicle.current_driver.uuid %}" class="fw-semibold text-decoration-none">{{ vehicle.current_driver.get_full_name }}</a>
+                    <div class="cell-secondary">{{ vehicle.current_driver.employee_id }} &middot; {{ vehicle.current_driver.mobile_number }}</div>
+                  </div>
+                </div>
+                {% if can_unassign %}
+                  {% for a in assignment_history %}
+                    {% if a.status == "ACTIVE" and a.primary_driver %}
+                      <form method="post" action="{% url 'vehicles:vehicle_unassign_driver' uuid=vehicle.uuid assignment_id=a.id %}" data-confirm="End this assignment?">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Unassign</button>
+                      </form>
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
+              </div>
+            {% else %}
+              {% include "components/empty_state.html" with icon="person-x" title="No driver assigned" message="Assign a driver to put this vehicle into active service." %}
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="card-fms">
+            <span class="section-title" style="font-size:.95rem;">Assignment History</span>
+            {% if assignment_history %}
+              <div class="timeline mt-3">
+                {% for a in assignment_history %}
+                  <div class="timeline-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <a href="{% url 'drivers:driver_detail' uuid=a.driver.uuid %}" class="fw-semibold text-decoration-none">{{ a.driver.get_full_name }}</a>
+                        <div class="cell-secondary">{{ a.get_assignment_type_display }}{% if a.primary_driver %} &middot; Primary{% endif %}</div>
+                        <div class="cell-secondary">{{ a.start_date }} &rarr; {{ a.end_date|default:"Ongoing" }}</div>
+                      </div>
+                      {% include "components/status_badge.html" with status=a.status label=a.get_status_display %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="text-muted-fms text-small mb-0">No assignment history yet.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+    {% elif active_tab == "trips" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Trips ({{ trip_count }})</span>
+        {% if trips %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Trip</th><th>Driver</th><th>Client</th><th>Route</th><th>Schedule</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for trip in trips %}
+                  <tr>
+                    <td><a href="{% url 'trips:trip_detail' uuid=trip.uuid %}">{{ trip.trip_number }}</a></td>
+                    <td class="cell-secondary">{% if trip.driver %}<a href="{% url 'drivers:driver_detail' uuid=trip.driver.uuid %}">{{ trip.driver.get_full_name }}</a>{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{{ trip.client.client_name }}</td>
+                    <td class="cell-secondary">{{ trip.route_label }}</td>
+                    <td class="cell-secondary">{{ trip.scheduled_start|date:"M d, H:i" }}</td>
+                    <td>{% include "components/status_badge.html" with status=trip.status label=trip.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No trips for this vehicle" message="Trips this vehicle is used on will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "gps" %}
+      <div class="card-fms">
+        {% if vehicle.tracking_device %}
+          <div class="row g-3">
+            <div class="col-md-3"><div class="cell-secondary">IMEI</div><div><a href="{% url 'tracking:device_detail' uuid=vehicle.tracking_device.uuid %}">{{ vehicle.tracking_device.imei }}</a></div></div>
+            <div class="col-md-3"><div class="cell-secondary">Device Model</div><div>{{ vehicle.tracking_device.device_model|default:"—" }}</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Provider</div><div>{{ vehicle.tracking_device.get_provider_display }}</div></div>
+            <div class="col-md-3"><div class="cell-secondary">Device Status</div>{% include "components/status_badge.html" with status=vehicle.tracking_device.status label=vehicle.tracking_device.get_status_display %}</div>
+          </div>
+          {% if current_telemetry %}
+            <div class="row g-3 mt-1">
+              <div class="col-md-3"><div class="cell-secondary">Connection</div>{% include "components/status_badge.html" with status=connection_status label=connection_status %}</div>
+              <div class="col-md-3"><div class="cell-secondary">Last Update</div><div>{{ current_telemetry.timestamp|date:"M d, H:i:s" }}</div></div>
+              <div class="col-md-3"><div class="cell-secondary">Speed</div><div>{{ current_telemetry.speed|default:"—" }} km/h</div></div>
+              <div class="col-md-3"><div class="cell-secondary">Ignition</div><div>{{ current_telemetry.ignition|yesno:"On,Off,Unknown" }}</div></div>
+              <div class="col-md-3"><div class="cell-secondary">Latitude</div><div>{{ current_telemetry.latitude }}</div></div>
+              <div class="col-md-3"><div class="cell-secondary">Longitude</div><div>{{ current_telemetry.longitude }}</div></div>
+              <div class="col-md-3"><div class="cell-secondary">Heading</div><div>{{ current_telemetry.heading|default:"—" }}&deg;</div></div>
+              <div class="col-md-3"><div class="cell-secondary">Odometer</div><div>{{ current_telemetry.odometer|default:"—" }}</div></div>
+            </div>
+            <div class="mt-3">
+              <a href="{% url 'tracking:live_map' %}?vehicle={{ vehicle.uuid }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-broadcast me-1"></i>Open in Live Tracking
+              </a>
+            </div>
+          {% else %}
+            {% include "components/empty_state.html" with icon="geo-alt" title="No telemetry received" message="This device hasn't reported a position yet." %}
+          {% endif %}
+        {% else %}
+          {% include "components/empty_state.html" with icon="broadcast" title="No GPS device linked" message="This vehicle has no tracking device assigned yet." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "maintenance" %}
+      <div class="card-fms mb-3">
+        <div class="row g-3">
+          <div class="col-md-3"><div class="cell-secondary">Last Service</div><div>{{ vehicle.last_service_date|default:"—" }}</div></div>
+          <div class="col-md-3"><div class="cell-secondary">Next Service</div><div>{{ vehicle.next_service_date|default:"—" }}{% if vehicle.next_service_odometer %} &middot; {{ vehicle.next_service_odometer }} {{ vehicle.odometer_unit }}{% endif %}</div></div>
+          <div class="col-md-3"><div class="cell-secondary">Overdue Services</div><div>{% if maintenance_overdue_count %}<span class="text-danger fw-semibold">{{ maintenance_overdue_count }}</span>{% else %}0{% endif %}</div></div>
+          <div class="col-md-3"><div class="cell-secondary">Total Maintenance Cost</div><div>{{ maintenance_cost_total }}</div></div>
+        </div>
+      </div>
+      {% has_module_perm request.user "maintenance" "create" as can_create_maintenance %}
+      <div class="card-fms">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="section-title" style="font-size:.95rem;">Maintenance History</span>
+          {% if can_create_maintenance %}
+            <a href="{% url 'maintenance:maintenance_create' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Schedule Maintenance</a>
+          {% endif %}
+        </div>
+        {% if maintenance_records %}
+          <div class="table-responsive-fms">
+            <table class="table">
+              <thead><tr><th>Maintenance</th><th>Type</th><th>Date</th><th>Odometer</th><th>Cost</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for m in maintenance_records %}
+                  <tr>
+                    <td><a href="{% url 'maintenance:maintenance_detail' uuid=m.uuid %}">{{ m.maintenance_number }}</a></td>
+                    <td class="cell-secondary">{{ m.get_maintenance_type_display }}</td>
+                    <td class="cell-secondary">{{ m.scheduled_date }}</td>
+                    <td class="cell-secondary">{{ m.odometer_at_service }}</td>
+                    <td class="cell-secondary">{% if m.actual_cost is not None %}{{ m.actual_cost }}{% elif m.estimated_cost is not None %}~{{ m.estimated_cost }}{% else %}—{% endif %}</td>
+                    <td>{% include "components/status_badge.html" with status=m.status label=m.get_status_display %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="tools" title="No maintenance records" message="Service jobs for this vehicle will appear here." %}
+        {% endif %}
+      </div>
+
+    {% elif active_tab == "documents" %}
+      {% include "components/document_tab.html" with documents=documents entity_type="vehicle" object_id=vehicle.id %}
+
+    {% elif active_tab == "history" %}
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Activity History</span>
+        {% if recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              <div class="timeline-item">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-{{ log.action|action_icon }}"></i>
+                  <div>
+                    <div>{{ log.get_action_display }} by {{ log.user.get_full_name|default:log.user.email|default:"System" }}</div>
+                    <div class="cell-secondary">{{ log.timestamp }}</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0">No activity recorded yet.</p>
+        {% endif %}
+      </div>
+
+    {% else %}
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="card-fms mb-3">
+            <span class="section-title" style="font-size:.95rem;">Vehicle Information</span>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4"><div class="cell-secondary">Type</div><div>{{ vehicle.vehicle_type.name|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Category</div><div>{{ vehicle.category.name|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Manufacturer</div><div>{{ vehicle.manufacturer|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Model Year</div><div>{{ vehicle.model_year|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Color</div><div>{{ vehicle.color|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">VIN</div><div>{{ vehicle.vin|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Chassis No.</div><div>{{ vehicle.chassis_number|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Engine No.</div><div>{{ vehicle.engine_number|default:"—" }}</div></div>
+            </div>
+          </div>
+          <div class="card-fms mb-3">
+            <span class="section-title" style="font-size:.95rem;">Technical</span>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4"><div class="cell-secondary">Fuel Type</div><div>{{ vehicle.fuel_type.name|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Transmission</div><div>{{ vehicle.get_transmission_type_display|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Seating Capacity</div><div>{{ vehicle.seating_capacity|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Engine Capacity</div><div>{{ vehicle.engine_capacity|default:"—" }} cc</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Load Capacity</div><div>{{ vehicle.load_capacity|default:"—" }} kg</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Mileage</div><div>{{ vehicle.mileage|default:"—" }} km/l</div></div>
+            </div>
+          </div>
+          <div class="card-fms">
+            <span class="section-title" style="font-size:.95rem;">Ownership &amp; Financial</span>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4"><div class="cell-secondary">Ownership Type</div><div>{{ vehicle.get_ownership_type_display }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Owner</div><div>{{ vehicle.owner_name|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Vendor</div><div>{% if vehicle.vendor %}<a href="{% url 'vendors:vendor_detail' uuid=vehicle.vendor.uuid %}">{{ vehicle.vendor.vendor_name }}</a>{% else %}—{% endif %}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Branch</div><div>{% if vehicle.branch %}<a href="{% url 'locations:branch_detail' uuid=vehicle.branch.uuid %}">{{ vehicle.branch.name }}</a>{% else %}—{% endif %}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Contract</div><div>{% if vehicle.contract %}<a href="{% url 'contracts:contract_detail' uuid=vehicle.contract.uuid %}">{{ vehicle.contract.contract_number }}</a>{% else %}—{% endif %}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Purchase Date</div><div>{{ vehicle.purchase_date|default:"—" }}</div></div>
+              <div class="col-md-4"><div class="cell-secondary">Purchase Price</div><div>{{ vehicle.purchase_price|default:"—" }}</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card-fms mb-3">
+            <span class="section-title" style="font-size:.95rem;">Operational</span>
+            <div class="d-flex flex-column gap-2 mt-2">
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Odometer</span><span>{{ vehicle.odometer_reading }} {{ vehicle.odometer_unit }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Trip Closure Time</span><span>{{ vehicle.trip_closure_minutes }} min</span></div>
+              <div class="d-flex justify-content-between gap-3"><span class="cell-secondary">Trip Start Validation</span>
+                <span class="text-end" title="A trip starts once {{ vehicle.trip_min_moving_records }} of {{ vehicle.trip_validation_records }} readings are at ≥ {{ vehicle.trip_min_speed_kmh }} km/h, or the vehicle gets {{ vehicle.trip_min_distance_m }} m away">{{ vehicle.trip_min_moving_records }}/{{ vehicle.trip_validation_records }} readings ≥ {{ vehicle.trip_min_speed_kmh }} km/h · {{ vehicle.trip_min_distance_m }} m</span>
+              </div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Idle Alert After</span><span>{{ vehicle.idle_alert_minutes }} min</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Current Driver</span>
+                <span>{% if vehicle.current_driver %}<a href="{% url 'drivers:driver_detail' uuid=vehicle.current_driver.uuid %}">{{ vehicle.current_driver.get_full_name }}</a>{% else %}—{% endif %}</span>
+              </div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">GPS</span>
+                <span>{% if vehicle.tracking_device %}{{ vehicle.tracking_device.get_status_display }}{% else %}No Device{% endif %}</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-fms mt-3">
+            <span class="section-title" style="font-size:.95rem;">Trip Summary</span>
+            <div class="d-flex flex-column gap-2 mt-2">
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Total Trips</span><span>{{ trip_count }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Completed</span><span>{{ completed_trip_count }}</span></div>
+              <div class="d-flex justify-content-between"><span class="cell-secondary">Distance Travelled</span><span>{{ trip_total_distance }} km</span></div>
+            </div>
+          </div>
+          {% if vehicle.remarks %}
+            <div class="card-fms">
+              <span class="section-title" style="font-size:.95rem;">Remarks</span>
+              <p class="text-small mb-0 mt-2">{{ vehicle.remarks }}</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if can_assign %}
+    <div class="modal fade" id="assignDriverModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="{% url 'vehicles:vehicle_assign_driver' uuid=vehicle.uuid %}">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h3 class="section-title mb-0" style="font-size:1rem;">Assign Driver to {{ vehicle.registration_number }}</h3>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label required-mark">{{ assign_form.driver.label }}</label>
+                {{ assign_form.driver }}
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">{{ assign_form.assignment_type.label }}</label>
+                  {{ assign_form.assignment_type }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label required-mark">{{ assign_form.start_date.label }}</label>
+                  {{ assign_form.start_date }}
+                </div>
+              </div>
+              <div class="form-check mt-3">
+                {{ assign_form.primary_driver }}
+                <label class="form-check-label" for="{{ assign_form.primary_driver.id_for_label }}">{{ assign_form.primary_driver.label }}</label>
+              </div>
+              <div class="mt-3">
+                <label class="form-label">{{ assign_form.remarks.label }}</label>
+                {{ assign_form.remarks }}
+              </div>
+              <p class="text-small text-muted-fms mt-3 mb-0">
+                <i class="bi bi-info-circle me-1"></i>If this vehicle already has a primary driver, that assignment will be ended automatically.
+              </p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Assign Driver</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

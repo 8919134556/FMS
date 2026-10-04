@@ -1,0 +1,414 @@
+/*
+ * FMS responsive layer
+ *
+ * Loaded LAST (after component and page CSS) so it can adapt every shared
+ * component in one place instead of scattering media queries through each
+ * page. Desktop styling lives in components.css / app.css and is untouched;
+ * everything here only applies below the breakpoint named in each section.
+ *
+ * Breakpoints follow Bootstrap 5:  xs <576 · sm ≥576 · md ≥768 · lg ≥992 · xl ≥1200
+ * (the sidebar becomes an off-canvas drawer below xl — see app.css).
+ *
+ * Contents
+ *   1. Safety nets (no horizontal page scroll)
+ *   2. Touch ergonomics (coarse pointers)
+ *   3. Top bar
+ *   4. Page header, breadcrumb, cards
+ *   5. Filter bar (collapsible on phones)
+ *   6. Tables — horizontal scroll on tablets, stacked cards on phones
+ *   7. Forms and sticky action bars
+ *   8. Dropdowns, modals, toasts, tabs, pagination
+ *   9. Utilities
+ */
+
+/* ---------------------------------------------------------------------- */
+/* 1. Safety nets                                                          */
+/* ---------------------------------------------------------------------- */
+
+.fms-main { min-width: 0; overflow-x: clip; }
+.fms-content { min-width: 0; }
+.fms-content img,
+.fms-content video,
+.fms-content canvas,
+.fms-content iframe { max-width: 100%; }
+.fms-content pre { max-width: 100%; overflow-x: auto; }
+.fms-content h1, .fms-content h2, .fms-content h3,
+.fms-content .cell-primary, .fms-content .section-title { overflow-wrap: anywhere; }
+/* Flex/grid children may otherwise refuse to shrink below their content width. */
+.fms-content .row > *, .fms-content .card-fms, .fms-content .table-card { min-width: 0; }
+
+/* ---------------------------------------------------------------------- */
+/* 2. Touch ergonomics                                                     */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 991.98px) {
+  /* 16px stops iOS Safari zooming the page when an input is focused. */
+  .form-control, .form-select, .form-control-sm, .form-select-sm,
+  .filter-bar .form-control, .filter-bar .form-select { font-size: 16px; min-height: 42px; padding-top: 8px; padding-bottom: 8px; }
+  textarea.form-control { min-height: 96px; }
+  .btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; }
+  .btn-sm { min-height: 38px; padding-left: 12px; padding-right: 12px; }
+  .form-check-input { width: 1.25rem; height: 1.25rem; }
+  .form-check-label { padding-left: 4px; }
+  .kebab-btn { width: 38px; height: 38px; }
+  .dropdown-item { padding-top: 10px; padding-bottom: 10px; }
+  .pagination .page-link { min-width: 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 3. Top bar                                                              */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 1199.98px) {
+  .fms-topbar { padding: 0 var(--fms-space-4); }
+}
+
+/* Tablets (768–991): the label-less Quick Add and the avatar-only user menu
+   keep the whole bar on one row next to a real search field. */
+@media (max-width: 991.98px) {
+  .quick-add-btn { width: 40px; padding: 0; }
+  .quick-add-btn .bi { margin: 0; font-size: 1.05rem; }
+  .quick-add-btn .quick-add-label { display: none; }
+  .quick-add-btn.dropdown-toggle::after { display: none; }
+  .user-menu-btn { padding: 2px; }
+  .user-menu-btn.dropdown-toggle::after { display: none; }
+}
+
+@media (max-width: 767.98px) {
+  .fms-topbar { gap: 6px; padding: 0 10px; }
+  .fms-topbar > * { flex-shrink: 0; }
+  .topbar-icon-btn { width: 40px; height: 40px; }
+
+  .topbar-title {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-shrink: 1 !important;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--fms-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Search becomes an icon button; it still opens the same command palette. */
+  .global-search { flex: 0 0 auto; width: 40px; height: 40px; max-width: none; }
+  .global-search .global-search-field {
+    width: 40px; height: 40px; padding: 0; font-size: 0; color: transparent; border-radius: var(--fms-radius-md);
+  }
+  .global-search .bi-search { left: 50%; transform: translate(-50%, -50%); font-size: 1rem; color: var(--fms-text-secondary); }
+  .global-search kbd { display: none; }
+
+  .quick-add-btn { width: 40px; padding: 0; }
+  .quick-add-btn .bi { margin: 0; font-size: 1.05rem; }
+  .quick-add-btn .quick-add-label { display: none; }
+  .quick-add-btn.dropdown-toggle::after { display: none; }
+
+  .user-menu-btn { padding: 2px; }
+  .user-menu-btn.dropdown-toggle::after { display: none; }
+}
+
+@media (max-width: 575.98px) {
+  .fms-topbar { gap: 4px; padding: 0 8px; }
+  .topbar-icon-btn, .global-search, .global-search .global-search-field, .quick-add-btn { width: 38px; height: 38px; }
+}
+
+/* Dropdown panels anchor to the (full-width) top bar on phones instead of the
+   narrow button they belong to, so they can never spill off-screen. */
+@media (max-width: 575.98px) {
+  .fms-topbar .dropdown { position: static; }
+  .fms-topbar .dropdown-menu {
+    position: absolute !important;
+    inset: calc(100% + 6px) 8px auto 8px !important;
+    transform: none !important;
+    width: auto !important;
+    max-width: none;
+    min-width: 0;
+  }
+  .notification-dropdown-list { max-height: min(60vh, 420px); }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 4. Page header, breadcrumb, cards                                       */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .fms-content { padding: var(--fms-space-4) var(--fms-space-3); }
+  .page-header { gap: var(--fms-space-3); margin-bottom: var(--fms-space-4); }
+  .page-title { font-size: 1.3rem; line-height: 1.25; }
+  .page-subtitle { font-size: 0.86rem; }
+  .breadcrumb-fms { flex-wrap: wrap; row-gap: 2px; }
+  .card-fms { border-radius: var(--fms-radius-md); padding: var(--fms-space-4); }
+  .chart-card { padding: var(--fms-space-4); }
+}
+
+@media (max-width: 767.98px) {
+  .table-card { overflow: visible; }
+  .table-card > .table-card-header { border-radius: var(--fms-radius-lg) var(--fms-radius-lg) 0 0; }
+}
+
+@media (max-width: 575.98px) {
+  /* Record headers: action buttons wrap instead of overflowing on 320px phones. */
+  .detail-header .d-flex.gap-2 { flex-wrap: wrap; }
+  .detail-header .btn { padding-left: 10px; padding-right: 10px; }
+  /* Detail pages: short label/value pairs sit two-up instead of one long column.
+     Wide fields (col-md-6/8/9/12 — addresses, notes) keep the full row. */
+  .fms-content .row > [class*="col-md-"]:has(> .cell-secondary:first-child):not(.col-md-6):not(.col-md-8):not(.col-md-9):not(.col-md-12):not(.col-12) {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+  .dashboard-kpi-grid.is-dense { grid-template-columns: repeat(2, 1fr); }
+  .dash-hero-side .dashboard-toolbar { display: grid; grid-template-columns: 1fr 1fr; }
+  .dash-hero-side .dashboard-toolbar > .form-select-sm { min-width: 0; }
+  .dash-hero-side .dashboard-toolbar > .btn { grid-column: 1 / -1; }
+  .card-fms.p-4 { padding: var(--fms-space-4) !important; }
+  .card-fms.p-5 { padding: var(--fms-space-4) !important; }
+  /* KPI tiles stay two-up on phones (one-per-row made dashboards a long scroll). */
+  .dashboard-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: var(--fms-space-2); }
+  .fms-content .row > [class*="col"]:has(> .kpi-card),
+  .fms-content .row > [class*="col"]:has(> a.kpi-card) { flex: 0 0 50%; max-width: 50%; }
+  .kpi-card { gap: 6px; }
+  .kpi-card-top { gap: 6px; }
+  .kpi-label { font-size: 10px; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+  .kpi-icon { width: 28px; height: 28px; flex-shrink: 0; }
+  .page-header { flex-direction: column; align-items: stretch; }
+  .page-header-actions { width: 100%; }
+  .page-header-actions > .btn,
+  .page-header-actions > form,
+  .page-header-actions > .dropdown { flex: 1 1 calc(50% - var(--fms-space-2)); }
+  .page-header-actions > form .btn,
+  .page-header-actions > .dropdown .btn { width: 100%; }
+  .page-header-actions > .btn:only-child { flex-basis: 100%; }
+  .kpi-card { padding: var(--fms-space-3); }
+  .kpi-value { font-size: 1.35rem; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 5. Filter bar — a collapsible "Filters" panel on phones                 */
+/* ---------------------------------------------------------------------- */
+
+.filter-bar-toggle { display: none; }
+
+@media (max-width: 767.98px) {
+  .filter-bar { padding: 0; overflow: hidden; }
+  .filter-bar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 46px;
+    padding: 0 var(--fms-space-4);
+    border: 0;
+    background: transparent;
+    color: var(--fms-text-primary);
+    font-weight: 600;
+    font-size: var(--fms-text-body);
+  }
+  .filter-bar-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 8px;
+    padding: 0 6px;
+    border-radius: var(--fms-radius-full);
+    background: var(--fms-primary);
+    color: var(--fms-text-on-accent, #fff);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .filter-bar-count[hidden] { display: none; }
+  .filter-bar-chevron { transition: transform var(--fms-duration-fast) var(--fms-ease); color: var(--fms-text-muted); }
+  .filter-bar.is-open .filter-bar-chevron { transform: rotate(180deg); }
+  .filter-bar form { display: none; padding: var(--fms-space-3) var(--fms-space-4) var(--fms-space-4); border-top: 1px solid var(--fms-border); }
+  .filter-bar.is-open form { display: flex; }
+  /* Free-text fields need the full row; selects/dates pair up two per row. */
+  .filter-bar .filter-field-search { flex: 0 0 100%; max-width: 100%; }
+  .filter-bar form > .col-6:last-child { flex: 0 0 100%; max-width: 100%; }
+  .filter-bar form > .col-6:last-child .btn { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 6. Tables                                                               */
+/* ---------------------------------------------------------------------- */
+
+.table-responsive-fms { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+
+@media (max-width: 991.98px) {
+  /* Tablets: keep the real table (so columns line up) and let it scroll
+     sideways inside its card instead of squashing each column. */
+  .table-responsive-fms > .table:not(.table-stack) { min-width: 680px; }
+  .table-card-header { flex-wrap: wrap; padding: var(--fms-space-3) var(--fms-space-4); }
+  .table > tbody > tr > td { padding: 10px var(--fms-space-3); }
+  .table > thead > tr > th { padding: 10px var(--fms-space-3); }
+}
+
+@media (max-width: 575.98px) {
+  .table-card-title { flex: 1 1 100%; }
+  .table-card-actions { flex: 1 1 100%; }
+  .table-card-actions > .btn { flex: 1 1 0; }
+}
+
+/*
+ * Phones: rows become cards. app.js copies each column's header text onto
+ * its cells as data-label (and re-does it when a table is re-rendered), so
+ * no per-table markup is needed. Opt out with class "no-stack" (e.g. the
+ * permission matrix, which must stay a grid) — those keep scrolling sideways.
+ */
+@media (max-width: 767.98px) {
+  .table-responsive-fms { overflow-x: visible; }
+  .table-responsive-fms > .table.is-stacked { min-width: 0; }
+  .table.is-stacked,
+  .table.is-stacked > tbody { display: block; width: 100%; }
+  .table.is-stacked > thead {
+    /* visually hidden but still read by screen readers */
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .table.is-stacked > tbody > tr {
+    display: block;
+    position: relative;
+    margin: var(--fms-space-3);
+    border: 1px solid var(--fms-border);
+    border-radius: var(--fms-radius-md);
+    background: var(--fms-card);
+    /* no overflow:hidden — it would clip the row's dropdown menu */
+  }
+  .table.is-stacked > tbody > tr:hover { background: var(--fms-card); }
+  .table.is-stacked > tbody > tr > td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fms-space-3);
+    width: 100%;
+    padding: 9px var(--fms-space-3);
+    border-bottom: 1px solid var(--fms-border);
+    text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .table.is-stacked > tbody > tr > td:last-child { border-bottom: 0; }
+  .table.is-stacked > tbody > tr > td::before {
+    content: attr(data-label);
+    flex: 0 0 34%;
+    max-width: 42%;
+    text-align: left;
+    color: var(--fms-text-muted);
+    font-size: var(--fms-text-tiny);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  /* The first cell is the record's identity: full-width card header, no label. */
+  .table.is-stacked > tbody > tr > td:first-child {
+    background: var(--fms-bg-elevated);
+    justify-content: flex-start;
+    text-align: left;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .table.is-stacked > tbody > tr > td:first-child { border-radius: var(--fms-radius-md) var(--fms-radius-md) 0 0; padding-right: 52px; }
+  .table.is-stacked > tbody > tr > td:first-child::before { display: none; }
+  /* Kebab/actions cell: pinned to the card header's top-right corner. */
+  .table.is-stacked > tbody > tr > td.cell-actions {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    z-index: 2;
+  }
+  .table.is-stacked > tbody > tr > td.cell-actions::before { display: none; }
+  .table.is-stacked > tbody > tr > td:has(+ td.cell-actions:last-child) { border-bottom: 0; }
+  .table.is-stacked > tbody > tr > td.cell-actions .dropdown-menu { text-align: left; }
+  /* Button-style actions: a wrapped row of full-width-ish buttons under the fields. */
+  .table.is-stacked > tbody > tr > td.cell-actions-inline {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: var(--fms-space-2);
+    background: var(--fms-bg-elevated);
+    border-radius: 0 0 var(--fms-radius-md) var(--fms-radius-md);
+  }
+  .table.is-stacked > tbody > tr > td.cell-actions-inline::before { display: none; }
+  .table.is-stacked > tbody > tr > td.cell-actions-inline > *,
+  .table.is-stacked > tbody > tr > td.cell-actions-inline form { flex: 1 1 auto; }
+  .table.is-stacked > tbody > tr > td.cell-actions-inline .btn { width: 100%; }
+  /* Cells with no header text (row actions, checkboxes) drop the label column. */
+  .table.is-stacked > tbody > tr > td[data-label=""]::before { display: none; }
+  .table.is-stacked > tbody > tr > td[data-label=""] { justify-content: flex-end; }
+  .table.is-stacked > tbody > tr > td > .d-flex,
+  .table.is-stacked > tbody > tr > td > a.d-flex { min-width: 0; text-align: left; }
+  /* Stacked cards already separate rows; the empty-state row spans the card. */
+  .table.is-stacked > tbody > tr.stack-skip { display: table-row; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 7. Forms and sticky action bars                                         */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .form-section { padding: var(--fms-space-4); border-radius: var(--fms-radius-md); }
+  .form-section-header { margin-bottom: var(--fms-space-3); }
+  .upload-dropzone { padding: var(--fms-space-5) var(--fms-space-3); }
+  .input-group { flex-wrap: nowrap; }
+}
+
+@media (max-width: 575.98px) {
+  .form-actions-sticky {
+    /* Cancel | Save side by side: a stacked pair ate a quarter of the screen. */
+    flex-direction: row;
+    gap: var(--fms-space-2);
+    padding: var(--fms-space-3);
+    padding-bottom: calc(var(--fms-space-3) + env(safe-area-inset-bottom, 0px));
+    margin-left: calc(var(--fms-space-3) * -1);
+    margin-right: calc(var(--fms-space-3) * -1);
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+  .form-actions-sticky .btn { flex: 1 1 0; min-width: 0; }
+  .form-actions-sticky .btn-primary { flex: 2 1 0; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 8. Dropdowns, modals, toasts, tabs, pagination                          */
+/* ---------------------------------------------------------------------- */
+
+.dropdown-menu { max-width: calc(100vw - 16px); }
+.notification-dropdown { width: min(340px, calc(100vw - 16px)); }
+
+@media (max-width: 575.98px) {
+  .modal-dialog:not(.modal-fullscreen) { margin: 8px; max-width: none; }
+  .modal-content { max-height: calc(100dvh - 16px); overflow: hidden; }
+  .modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .modal-footer { flex-wrap: wrap; gap: var(--fms-space-2); }
+  .modal-footer > .btn { flex: 1 1 auto; margin: 0; }
+  .fms-toast-stack, .toast-container { left: 8px !important; right: 8px !important; max-width: none !important; }
+  .toast { max-width: 100%; width: 100%; }
+}
+
+.tabs-fms { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tabs-fms::-webkit-scrollbar { display: none; }
+
+@media (max-width: 575.98px) {
+  .fms-content nav.d-flex.justify-content-between.flex-wrap.border-top { justify-content: center !important; text-align: center; }
+  .pagination { flex-wrap: wrap; justify-content: center; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 9. Utilities                                                            */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .hide-on-mobile { display: none !important; }
+  .stack-on-mobile { flex-direction: column !important; align-items: stretch !important; }
+  .full-on-mobile { width: 100% !important; }
+}
+
+/* The collapse-to-icons control is a desktop-only affordance; on tablets/phones the sidebar is a drawer. */
+@media (max-width: 1199.98px) {
+  .sidebar-footer { display: none; }
+}

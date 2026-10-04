@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load static fms_extras %}
+{% block title %}Dispatch Board · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/dispatch_board.css' %}">{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms"><span>Operations</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Dispatch Board</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Dispatch Board</h1>
+      <p class="page-subtitle">Assign resources, monitor readiness, and manage trip dispatch operations.</p>
+    </div>
+    <div class="page-header-actions">
+      <div class="dispatch-toolbar">
+        <div class="btn-group" role="group" aria-label="Date navigation">
+          <a class="btn btn-sm btn-outline-secondary" href="?{% querystring_replace date=date_prev %}" title="Previous day"><i class="bi bi-chevron-left"></i></a>
+          <a class="btn btn-sm {% if is_today %}btn-secondary{% else %}btn-outline-secondary{% endif %}" href="?{% querystring_replace date=date_today %}">
+            {% if is_today %}Today{% else %}{{ selected_date|date:"M d, Y" }}{% endif %}
+          </a>
+          <a class="btn btn-sm btn-outline-secondary" href="?{% querystring_replace date=date_next %}" title="Next day"><i class="bi bi-chevron-right"></i></a>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="dispatchRefreshBtn">
+          <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# Attention Summary — the "what needs my attention right now" glance strip. #}
+  <div class="dispatch-attention-grid mb-3">
+    {% for item in attention_summary %}
+      <a href="{{ item.url }}" class="dispatch-attention-tile tone-{{ item.tone }}{% if item.count == 0 %} is-clear{% endif %}">
+        <span class="dispatch-attention-count">{{ item.count }}</span>
+        <span class="dispatch-attention-label">{{ item.label }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <button type="button" class="btn btn-sm btn-outline-secondary d-md-none mb-2" id="dispatchFiltersToggle" aria-expanded="false" aria-controls="dispatchFiltersPanel">
+    <i class="bi bi-funnel me-1"></i>Filters
+  </button>
+  <div id="dispatchFiltersPanel" class="dispatch-filters-panel">
+    {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+  </div>
+
+  <div class="dispatch-quick-filters" role="tablist" aria-label="Quick status filter">
+    <a href="?{% querystring_replace quick_filter="" %}" class="quick-filter-pill {% if not quick_filter %}active{% endif %}">All<span class="pill-count">{{ quick_filter_counts.all|default:0 }}</span></a>
+    <a href="?{% querystring_replace quick_filter="needs_assignment" %}" class="quick-filter-pill {% if quick_filter == "needs_assignment" %}active{% endif %}">Needs Assignment<span class="pill-count">{{ quick_filter_counts.needs_assignment|default:0 }}</span></a>
+    <a href="?{% querystring_replace quick_filter="ready" %}" class="quick-filter-pill {% if quick_filter == "ready" %}active{% endif %}">Ready<span class="pill-count">{{ quick_filter_counts.ready|default:0 }}</span></a>
+    <a href="?{% querystring_replace quick_filter="in_progress" %}" class="quick-filter-pill {% if quick_filter == "in_progress" %}active{% endif %}">In Progress<span class="pill-count">{{ quick_filter_counts.in_progress|default:0 }}</span></a>
+    <a href="?{% querystring_replace quick_filter="delayed" %}" class="quick-filter-pill {% if quick_filter == "delayed" %}active{% endif %}">Delayed<span class="pill-count">{{ quick_filter_counts.delayed|default:0 }}</span></a>
+    <a href="?{% querystring_replace quick_filter="past_due" %}" class="quick-filter-pill {% if quick_filter == "past_due" %}active{% endif %}">Past Due<span class="pill-count">{{ quick_filter_counts.past_due|default:0 }}</span></a>
+  </div>
+
+  <div class="dispatch-column-nav d-md-none" role="tablist" aria-label="Select workflow column">
+    {% for column in columns %}
+      <button type="button" class="dispatch-column-nav-btn{% if forloop.first %} active{% endif %}" data-column-target="{{ column.key }}">
+        {{ column.label }}<span class="pill-count">{{ column.count }}</span>
+      </button>
+    {% endfor %}
+  </div>
+
+  <div class="dispatch-board-layout mt-3">
+    <div class="dispatch-board-main">
+      {% if columns_error %}
+        <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Trip board is unavailable.
+          <div class="mt-2"><a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Retry</a></div>
+        </div>
+      {% else %}
+        <div class="dispatch-board-columns">
+          {% for column in columns %}
+            <div class="dispatch-column emphasis-{{ column.key }}" data-column="{{ column.key }}"{% if not forloop.first %} data-mobile-hidden{% endif %}>
+              <div class="dispatch-column-header">
+                <span class="dispatch-column-label">{{ column.label }}</span>
+                <span class="status-pill tone-{{ column.status|status_badge }}"><span class="dot"></span>{{ column.count }}</span>
+              </div>
+              <div class="dispatch-column-body">
+                {% for trip in column.trips %}
+                  {% include "trips/_dispatch_trip_card.html" with trip=trip can_act=can_act %}
+                {% empty %}
+                  <div class="dispatch-column-empty">
+                    <p>{% if column.key == "needs_assignment" %}No trips waiting for assignment.{% elif column.key == "ready" %}No trips ready to dispatch.{% elif column.key == "dispatched" %}No trips currently dispatched.{% elif column.key == "in_progress" %}No trips in progress.{% else %}No delayed trips.{% endif %}</p>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="dispatch-board-side">
+      <div class="card-fms">
+        <span class="section-title" style="font-size:.95rem;">Available Resources</span>
+        <ul class="nav nav-tabs mt-2" id="dispatchResourceTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dispatchVehiclesPane" type="button" role="tab">Vehicles</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dispatchDriversPane" type="button" role="tab">Drivers</button>
+          </li>
+        </ul>
+        <div class="tab-content mt-2">
+          <div class="tab-pane fade show active" id="dispatchVehiclesPane" role="tabpanel">
+            {% if available_vehicles_error %}
+              <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Vehicle availability unavailable.</div>
+            {% elif available_vehicles %}
+              <input type="search" class="form-control form-control-sm mb-2" id="dispatchVehicleSearch" placeholder="Search registration, make, model, type…">
+              <div class="dispatch-resource-list" id="dispatchVehicleList">
+                {% for vehicle in available_vehicles %}
+                  <div class="dispatch-resource-row" data-search="{{ vehicle.registration_number|lower }} {{ vehicle.make|lower }} {{ vehicle.model|lower }} {{ vehicle.vehicle_type.name|lower }}">
+                    <div>
+                      <div class="fw-semibold"><a href="{% url 'vehicles:vehicle_detail' uuid=vehicle.uuid %}">{{ vehicle.registration_number }}</a></div>
+                      <div class="text-small text-muted-fms">{{ vehicle.vehicle_type.name }} &middot; {{ vehicle.make }} {{ vehicle.model }}</div>
+                      {% if vehicle.next_assignment %}<div class="text-small text-muted-fms">Next: {{ vehicle.next_assignment }}</div>{% endif %}
+                    </div>
+                    {% include "components/status_badge.html" with status="AVAILABLE" label="Available" %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              {% include "components/empty_state.html" with icon="truck-front" title="No vehicles available" message="No active, available vehicles right now." %}
+            {% endif %}
+          </div>
+          <div class="tab-pane fade" id="dispatchDriversPane" role="tabpanel">
+            {% if available_drivers_error %}
+              <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Driver availability unavailable.</div>
+            {% elif available_drivers %}
+              <input type="search" class="form-control form-control-sm mb-2" id="dispatchDriverSearch" placeholder="Search name, employee ID, phone…">
+              <div class="dispatch-resource-list" id="dispatchDriverList">
+                {% for driver in available_drivers %}
+                  <div class="dispatch-resource-row" data-search="{{ driver.first_name|lower }} {{ driver.last_name|lower }} {{ driver.employee_id|lower }} {{ driver.mobile_number|lower }}">
+                    <div>
+                      <div class="fw-semibold"><a href="{% url 'drivers:driver_detail' uuid=driver.uuid %}">{{ driver.get_full_name }}</a></div>
+                      <div class="text-small text-muted-fms">{{ driver.employee_id }}
+                        {% if driver.license_expiry_status %} &middot; License {{ driver.license_expiry_status|license_status_label }}{% endif %}
+                      </div>
+                      {% if driver.next_assignment %}<div class="text-small text-muted-fms">Next: {{ driver.next_assignment }}</div>{% endif %}
+                    </div>
+                    {% include "components/status_badge.html" with status="AVAILABLE" label="Available" %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              {% include "components/empty_state.html" with icon="person-badge" title="No drivers available" message="No active, available drivers right now." %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card-fms mt-3">
+        <span class="section-title" style="font-size:.95rem;">Recent Dispatch Activity</span>
+        {% if recent_activity_error %}
+          <div class="widget-error mt-2"><i class="bi bi-exclamation-triangle"></i>Activity unavailable.</div>
+        {% elif recent_activity %}
+          <div class="timeline mt-3">
+            {% for log in recent_activity %}
+              {% include "trips/_dispatch_activity_item.html" with log=log %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted-fms text-small mb-0 mt-2">No dispatch activity recorded yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Requires Attention — the operational exception area, promoted to full width so it isn't squeezed into a narrow sidebar. #}
+  <div class="card-fms mt-3" id="dispatchAttentionSection">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <span class="section-title" style="font-size:.95rem;">Requires Attention</span>
+        <p class="text-small text-muted-fms mb-0">Assignment conflicts and operational exceptions across the whole fleet, not scoped to the selected date.</p>
+      </div>
+      {% if alerts %}<span class="status-pill tone-danger"><span class="dot"></span>{{ alerts|length }}</span>{% endif %}
+    </div>
+    {% if alerts_error %}
+      <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Alerts unavailable.</div>
+    {% elif alerts %}
+      <div class="attention-list dispatch-attention-list">
+        {% for item in alerts %}
+          {% include "trips/_dispatch_alert_item.html" with item=item %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="widget-locked">
+        <div class="empty-icon" style="background: var(--fms-success-soft); color: var(--fms-success);"><i class="bi bi-check-lg"></i></div>
+        <h4>All clear</h4>
+        <p>No operational issues require attention.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'js/dispatch_board.js' %}"></script>{% endblock %}

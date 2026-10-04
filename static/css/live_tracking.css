@@ -1,0 +1,553 @@
+/* Live Tracking (Phase redesign) — tokens only, no raw hex; see design-tokens.css */
+
+/* ---------------- Header ---------------- */
+
+.live-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fms-space-3);
+  margin-bottom: var(--fms-space-3);
+}
+
+.live-header-title {
+  display: flex;
+  align-items: center;
+  gap: var(--fms-space-3);
+}
+
+.live-header-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--fms-radius-md);
+  background: linear-gradient(135deg, var(--fms-primary), var(--fms-info));
+  color: var(--fms-text-on-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.live-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--fms-space-2);
+}
+
+/* ---------------- Status filter bar ---------------- */
+
+.live-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fms-space-3);
+  margin-bottom: var(--fms-space-3);
+}
+
+.live-status-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.live-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--fms-radius-full);
+  border: 1px solid var(--fms-border);
+  background: var(--fms-card);
+  color: var(--fms-text-secondary);
+  font-size: var(--fms-text-small);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background var(--fms-duration-fast) var(--fms-ease), border-color var(--fms-duration-fast) var(--fms-ease), color var(--fms-duration-fast) var(--fms-ease);
+}
+
+.live-status-pill:hover {
+  background: var(--fms-card-hover);
+  color: var(--fms-text-primary);
+}
+
+.live-status-pill .live-status-pill-count {
+  background: var(--fms-surface-2);
+  color: var(--fms-text-secondary);
+  border-radius: var(--fms-radius-full);
+  padding: 1px 7px;
+  font-size: var(--fms-text-tiny);
+}
+
+.live-status-pill.active {
+  border-color: var(--fms-primary);
+  background: var(--fms-primary-soft);
+  color: var(--fms-primary);
+}
+
+.live-status-pill.active .live-status-pill-count {
+  background: var(--fms-primary);
+  color: var(--fms-text-on-accent);
+}
+
+.live-status-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--fms-space-2);
+}
+
+.live-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.live-search-wrap i {
+  position: absolute;
+  left: 10px;
+  color: var(--fms-text-muted);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+
+.live-search-wrap input {
+  padding-left: 30px;
+  min-width: 220px;
+}
+
+.live-options-menu {
+  min-width: 220px;
+}
+
+/* ---------------- Map shell ---------------- */
+
+/* The map leaves room for the table: sized as calc(100vh - 340px) with a
+   460px floor it filled the viewport on every screen, pushing the Vehicle
+   Status table (the page's other half) entirely below the fold — 0px of it
+   visible on a 1280x720 laptop. Now it takes the viewport minus the page header
+   above it (~200px) AND the table's header + first row below it (~200px),
+   capped at 640px, so the table is always visibly there on load. */
+.live-map-shell {
+  position: relative;
+  height: clamp(320px, calc(100vh - 400px), 640px);
+  border-radius: var(--fms-radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--fms-border);
+  box-shadow: var(--fms-shadow-sm);
+}
+
+#liveMap {
+  width: 100%;
+  height: 100%;
+  background: var(--fms-surface-2);
+}
+
+.map-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 450;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fms-bg-elevated);
+  transition: opacity var(--fms-duration-base) var(--fms-ease);
+}
+
+.map-loading-overlay.d-none {
+  display: none;
+}
+
+.map-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--fms-border);
+  border-top-color: var(--fms-primary);
+  animation: live-spin 0.8s linear infinite;
+}
+
+@keyframes live-spin {
+  to { transform: rotate(360deg); }
+}
+
+.map-controls-top-right {
+  position: absolute;
+  top: var(--fms-space-3);
+  right: var(--fms-space-3);
+  z-index: 500;
+  display: flex;
+  gap: 6px;
+}
+
+.map-controls-top-right .btn.active {
+  background: var(--fms-primary);
+  color: var(--fms-text-on-accent);
+  border-color: var(--fms-primary);
+}
+
+.map-refresh-error {
+  position: absolute;
+  bottom: var(--fms-space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: var(--fms-card);
+  border: 1px solid var(--fms-danger);
+  color: var(--fms-text-primary);
+  border-radius: var(--fms-radius-md);
+  padding: 8px 14px;
+  box-shadow: var(--fms-shadow-md);
+  font-size: var(--fms-text-small);
+}
+
+.map-empty-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--fms-bg-elevated);
+  text-align: center;
+  padding: var(--fms-space-4);
+}
+
+/* Marker */
+.fleet-marker-icon {
+  background: transparent;
+  border: none;
+}
+
+.fleet-marker-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fms-text-on-accent);
+  box-shadow: var(--fms-shadow-sm);
+  border: 2px solid var(--fms-bg-elevated);
+  font-size: 12px;
+  transition: transform var(--fms-duration-base) var(--fms-ease);
+}
+
+.fleet-marker-dot.is-selected {
+  outline: 3px solid var(--fms-primary);
+  outline-offset: 2px;
+}
+
+.fleet-marker-dot.is-offline {
+  opacity: 0.65;
+}
+
+/* Floating vehicle panel — desktop overlay, mobile bottom sheet (one
+   ruleset pair, no duplicate markup) */
+.vehicle-floating-panel {
+  position: absolute;
+  top: var(--fms-space-3);
+  left: var(--fms-space-3);
+  width: 320px;
+  max-width: calc(100% - var(--fms-space-3) * 2);
+  max-height: calc(100% - var(--fms-space-3) * 2);
+  background: var(--fms-card);
+  border: 1px solid var(--fms-border);
+  border-radius: var(--fms-radius-lg);
+  box-shadow: var(--fms-shadow-lg);
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity var(--fms-duration-base) var(--fms-ease), transform var(--fms-duration-base) var(--fms-ease);
+}
+
+.vehicle-floating-panel.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.vehicle-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--fms-space-3) var(--fms-space-3);
+  border-bottom: 1px solid var(--fms-border);
+  flex-shrink: 0;
+}
+
+.vehicle-panel-body {
+  padding: var(--fms-space-3) var(--fms-space-4) var(--fms-space-4);
+  overflow-y: auto;
+}
+
+/* ---------------- Vehicle Status table section ---------------- */
+
+.vehicle-status-section {
+  padding: var(--fms-space-4);
+}
+
+.vehicle-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fms-space-3);
+  margin-bottom: var(--fms-space-3);
+  flex-wrap: wrap;
+}
+
+.vehicle-status-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fms-space-3);
+  flex-wrap: wrap;
+}
+
+.vehicle-status-row {
+  cursor: pointer;
+  transition: background var(--fms-duration-fast) var(--fms-ease);
+}
+
+.vehicle-status-row.is-selected {
+  background: var(--fms-primary-soft);
+}
+
+/* Address column: one line with an ellipsis, full text on hover (title). */
+.cell-location {
+  max-width: 320px;
+  min-width: 180px;
+}
+
+.vehicle-location {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fms-text-small);
+}
+
+.vehicle-location .bi {
+  color: var(--fms-primary);
+}
+
+.ignition-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fms-text-small);
+  font-weight: 600;
+}
+
+.ignition-indicator .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.ignition-indicator.is-on { color: var(--fms-success); }
+.ignition-indicator.is-on .dot { background: var(--fms-success); }
+.ignition-indicator.is-off { color: var(--fms-text-muted); }
+.ignition-indicator.is-off .dot { background: var(--fms-text-muted); }
+
+.fleet-no-telemetry-note {
+  padding: var(--fms-space-3);
+  border: 1px dashed var(--fms-border);
+  border-radius: var(--fms-radius-sm);
+}
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 1023px) {
+  .live-map-shell {
+    height: clamp(320px, 50vh, 560px);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .live-status-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .live-status-controls {
+    justify-content: space-between;
+  }
+  .live-search-wrap input {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .vehicle-floating-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 65vh;
+    border-radius: var(--fms-radius-lg) var(--fms-radius-lg) 0 0;
+    box-shadow: var(--fms-shadow-lg);
+    z-index: 1040;
+    transform: translateY(100%);
+  }
+  .vehicle-floating-panel.is-open {
+    transform: translateY(0);
+  }
+
+  .live-map-shell {
+    height: clamp(280px, 45vh, 420px);
+  }
+}
+
+/* ---------------- Auto-refresh controls & feed health ---------------- */
+
+.live-updated-line { display: flex; align-items: center; gap: 8px; }
+
+/* Pulses while a refresh request is in flight. */
+.live-refresh-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fms-text-muted);
+  opacity: 0.55;
+  flex-shrink: 0;
+  transition: background var(--fms-duration-fast) var(--fms-ease), opacity var(--fms-duration-fast) var(--fms-ease);
+}
+.live-refresh-dot.is-active {
+  background: var(--fms-success);
+  opacity: 1;
+  animation: live-pulse 0.9s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--fms-primary-rgb), 0); transform: scale(1); }
+  50% { box-shadow: 0 0 0 5px rgba(var(--fms-primary-rgb), 0.18); transform: scale(1.25); }
+}
+
+.live-interval-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--fms-text-muted);
+  font-size: var(--fms-text-small);
+  white-space: nowrap;
+}
+.live-interval-field .form-select { width: auto; min-width: 118px; }
+
+.live-refresh-btn.is-refreshing .bi,
+#vehicleStatusRefreshBtn.is-refreshing .bi { animation: live-spin 0.8s linear infinite; }
+@keyframes live-spin { to { transform: rotate(360deg); } }
+
+.live-feed-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fms-space-2);
+  margin-bottom: var(--fms-space-3);
+  padding: var(--fms-space-3) var(--fms-space-4);
+  border: 1px solid rgba(var(--fms-warning-rgb), 0.45);
+  border-radius: var(--fms-radius-md);
+  background: var(--fms-warning-soft);
+  color: var(--fms-text-primary);
+  font-size: var(--fms-text-small);
+  overflow-wrap: anywhere;
+}
+.live-feed-notice .bi { color: var(--fms-warning); margin-top: 2px; flex-shrink: 0; }
+
+.live-status-pills { min-width: 0; max-width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-refresh-dot.is-active { animation: none; }
+}
+
+/* ---- Phones ---- */
+
+@media (max-width: 767.98px) {
+  .live-header { align-items: stretch; }
+  .live-header-actions { width: 100%; }
+  .live-interval-field { flex: 1 1 auto; min-width: 0; }
+  .live-interval-field .form-select { flex: 1 1 auto; min-width: 0; width: 100%; }
+  .live-refresh-btn { flex: 0 0 auto; min-width: 112px; }
+  .live-status-pills { -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+  .live-status-pills::-webkit-scrollbar { display: none; }
+  .live-status-controls { width: 100%; }
+  .live-search-wrap { flex: 1 1 auto; min-width: 0; }
+  .live-search-wrap input { width: 100%; }
+  .map-controls-top-right .btn { min-height: 40px; min-width: 40px; }
+  .vehicle-status-header { flex-wrap: wrap; }
+  .cell-location { max-width: none; min-width: 0; }
+  .vehicle-location { white-space: normal; text-align: right; }
+}
+
+@media (max-width: 575.98px) {
+  .live-interval-label { display: none; }
+  .live-header-title .page-title { font-size: 1.2rem; }
+  .live-header-icon { width: 38px; height: 38px; }
+}
+
+
+/* ---------------- Vehicle table: Live Map action ---------------- */
+
+.live-map-cell { width: 1%; white-space: nowrap; text-align: right; }
+.live-map-btn { white-space: nowrap; }
+
+/* ---------------- Live Map popup (one vehicle) ---------------- */
+
+.live-vehicle-heading { display: flex; align-items: center; gap: var(--fms-space-3); min-width: 0; }
+.live-vehicle-heading .live-header-icon { width: 38px; height: 38px; flex-shrink: 0; }
+.live-vehicle-heading .min-w-0 { min-width: 0; }
+.live-vehicle-heading .section-title,
+.live-vehicle-heading .text-small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.live-vehicle-layout { display: grid; grid-template-columns: 1fr; }
+.live-vehicle-map-wrap { position: relative; }
+.live-vehicle-map { height: clamp(260px, 42vh, 420px); background: var(--fms-surface-2); }
+.live-vehicle-map-notice {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 500;
+  max-width: 80%;
+  padding: 8px 14px;
+  border-radius: var(--fms-radius-md);
+  background: var(--fms-card);
+  box-shadow: var(--fms-shadow-md, var(--fms-shadow-sm));
+  font-size: var(--fms-text-small);
+  color: var(--fms-text-secondary);
+  text-align: center;
+}
+
+.live-vehicle-details {
+  padding: var(--fms-space-3) var(--fms-space-4);
+  border-top: 1px solid var(--fms-border);
+  font-size: var(--fms-text-small);
+}
+.live-vehicle-status { display: flex; align-items: center; gap: 8px; margin-bottom: var(--fms-space-2); }
+.live-vehicle-row {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) 1fr;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--fms-border);
+}
+.live-vehicle-row > span:last-child { text-align: right; overflow-wrap: anywhere; }
+
+/* Desktop: map left, details beside it. */
+@media (min-width: 992px) {
+  .live-vehicle-layout { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); }
+  .live-vehicle-map { height: min(62vh, 560px); }
+  .live-vehicle-details { border-top: 0; border-left: 1px solid var(--fms-border); max-height: min(62vh, 560px); overflow-y: auto; }
+}
+
+/* Phones: near full-screen sheet, map on top, details scroll below. */
+@media (max-width: 575.98px) {
+  .live-vehicle-dialog { margin: var(--fms-space-2); }
+  .live-vehicle-map { height: 40vh; }
+}

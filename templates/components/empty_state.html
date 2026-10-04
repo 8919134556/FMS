@@ -1,0 +1,7 @@
+{# Usage: {% include "components/empty_state.html" with icon="people" title="No users found" message="Try adjusting your search or filters." %} #}
+<div class="empty-state">
+  <div class="empty-icon"><i class="bi bi-{{ icon|default:'inbox' }}"></i></div>
+  <h4>{{ title|default:"Nothing here yet" }}</h4>
+  {% if message %}<p>{{ message }}</p>{% endif %}
+  {% if action_url %}<a href="{{ action_url }}" class="btn btn-primary btn-sm">{{ action_label|default:"Get started" }}</a>{% endif %}
+</div>

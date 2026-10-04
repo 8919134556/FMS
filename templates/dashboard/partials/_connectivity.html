@@ -1,0 +1,19 @@
+{% load fms_extras %}
+  {% comment %}============ Section 1b: Fleet Connectivity (live telemetry) ============{% endcomment %}
+  {% if fleet_connectivity %}
+    <div class="card-fms mt-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <span class="section-title" style="font-size:.95rem;">Fleet Connectivity</span>
+          <p class="text-small text-muted-fms mb-0">Real-time GPS connection status, from the fleet's actual telemetry.</p>
+        </div>
+        <a href="{% url 'tracking:live_map' %}" class="btn btn-sm btn-outline-secondary">Open Live Tracking</a>
+      </div>
+      <div class="today-ops-grid">
+        {% include "components/kpi_card.html" with label="Online" value=fleet_connectivity.online icon="broadcast" tone="success" href="/tracking/live/?status=online" %}
+        {% include "components/kpi_card.html" with label="Stale" value=fleet_connectivity.stale icon="hourglass-split" tone="warning" href="/tracking/live/?status=stale" %}
+        {% include "components/kpi_card.html" with label="Offline" value=fleet_connectivity.offline icon="wifi-off" tone="neutral" href="/tracking/live/?status=offline" %}
+        {% include "components/kpi_card.html" with label="No Telemetry" value=fleet_connectivity.no_telemetry icon="geo-alt" tone="neutral" href="/tracking/devices/?assigned=no" %}
+      </div>
+    </div>
+  {% endif %}

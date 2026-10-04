@@ -1,0 +1,22 @@
+{% comment %}
+Single global confirmation modal. Any <form data-confirm="Message" data-confirm-title="Optional title">
+is intercepted by app.js: submit is paused, this modal shows the message, and the
+original form only submits if the user clicks "Confirm". Included once in base.html.
+{% endcomment %}
+<div class="modal fade" id="fmsConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+    <div class="modal-content">
+      <div class="modal-body pt-4 px-4 text-center">
+        <div class="empty-icon mx-auto mb-3" style="background: var(--fms-danger-soft); color: var(--fms-danger);">
+          <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <h3 class="section-title mb-2" id="fmsConfirmModalTitle">Are you sure?</h3>
+        <p class="text-secondary-fms mb-0" id="fmsConfirmModalBody"></p>
+      </div>
+      <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="fmsConfirmModalAccept">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>

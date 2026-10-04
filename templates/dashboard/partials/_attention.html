@@ -1,0 +1,32 @@
+{% load fms_extras %}
+  {% comment %}============ Section 4: Needs Attention ============{% endcomment %}
+  <div class="card-fms chart-card dash-panel">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="section-title" style="font-size:.95rem;">Needs Attention</span>
+      {% if attention_items %}<span class="status-pill tone-danger"><span class="dot"></span>{{ attention_items|length }}</span>{% endif %}
+    </div>
+    {% if attention_error %}
+      <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load attention items.
+        <div class="mt-2"><a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Retry</a></div>
+      </div>
+    {% elif attention_items %}
+      <div class="attention-list">
+        {% for item in attention_items %}
+          <div class="attention-item sev-{{ item.severity }}">
+            <span class="attention-icon"><i class="bi bi-{{ item.icon }}"></i></span>
+            <div class="attention-body">
+              <div class="attention-title">{{ item.title }}</div>
+              <div class="attention-desc">{{ item.description }}</div>
+            </div>
+            <a href="{{ item.url }}" class="attention-action btn btn-sm btn-outline-secondary">View</a>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="widget-locked">
+        <div class="empty-icon" style="background: var(--fms-success-soft); color: var(--fms-success);"><i class="bi bi-check-lg"></i></div>
+        <h4>Everything looks good</h4>
+        <p>No issues requiring attention right now.</p>
+      </div>
+    {% endif %}
+  </div>

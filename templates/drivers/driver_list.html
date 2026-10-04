@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Drivers · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  {% has_module_perm request.user "driver" "create" as can_create %}
+
+  <div class="breadcrumb-fms"><span>Fleet</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Drivers</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Drivers</h1>
+      <p class="page-subtitle">Manage drivers, licenses, assignments and operational status.</p>
+    </div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="All Drivers" count=page_obj.paginator.count export_url=export_url create_url=create_url create_label="Add Driver" can_create=can_create %}
+
+    {% if drivers %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Driver</th>
+              <th>Contact</th>
+              <th>License</th>
+              <th>Assigned Vehicle</th>
+              <th>Client</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for driver in drivers %}
+              {% with current_vehicle=driver.current_vehicle_list.0 %}
+              <tr>
+                <td>
+                  <a href="{% url 'drivers:driver_detail' uuid=driver.uuid %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                    {% if driver.profile_photo %}
+                      <img src="{{ driver.profile_photo.url }}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;">
+                    {% else %}
+                      <span class="avatar-chip" style="width:34px;height:34px;border-radius:8px;font-size:11px;">
+                        <i class="bi bi-person"></i>
+                      </span>
+                    {% endif %}
+                    <span>
+                      <div style="color:var(--fms-text-primary);font-weight:600;font-size:.82rem;">{{ driver.get_full_name }}</div>
+                      <div class="cell-secondary">{{ driver.employee_id }}</div>
+                    </span>
+                  </a>
+                </td>
+                <td class="cell-secondary">
+                  <div>{{ driver.mobile_number }}</div>
+                  {% if driver.email %}<div class="cell-secondary">{{ driver.email }}</div>{% endif %}
+                </td>
+                <td class="cell-secondary">
+                  <div>{{ driver.license_number }}</div>
+                  {% if driver.license_expiry_status %}
+                    {% include "components/status_badge.html" with status=driver.license_expiry_status label=driver.license_expiry_status|license_status_label %}
+                  {% endif %}
+                </td>
+                <td class="cell-secondary">
+                  {% if current_vehicle %}
+                    <a href="{% url 'vehicles:vehicle_detail' uuid=current_vehicle.uuid %}">{{ current_vehicle.registration_number }}</a>
+                    <div class="cell-secondary">{{ current_vehicle.make }} {{ current_vehicle.model }}</div>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="cell-secondary">{{ driver.client.client_name|default:"—" }}</td>
+                <td>{% include "components/status_badge.html" with status=driver.employment_status label=driver.get_employment_status_display %}</td>
+                <td class="text-end">
+                  <div class="dropdown">
+                    <button class="kebab-btn" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'drivers:driver_detail' uuid=driver.uuid %}"><i class="bi bi-eye"></i>View</a></li>
+                      {% has_module_perm request.user "driver" "update" as can_update %}
+                      {% if can_update %}
+                        <li><a class="dropdown-item" href="{% url 'drivers:driver_edit' uuid=driver.uuid %}"><i class="bi bi-pencil"></i>Edit</a></li>
+                      {% endif %}
+                      {% has_module_perm request.user "assignment" "create" as can_assign %}
+                      {% if can_assign %}
+                        <li><a class="dropdown-item" href="{% url 'drivers:driver_detail' uuid=driver.uuid %}?tab=vehicles"><i class="bi bi-truck-front"></i>Assign Vehicle</a></li>
+                      {% endif %}
+                      <li><span class="dropdown-item disabled" title="Available once Documents ships"><i class="bi bi-file-earmark-arrow-up"></i>Documents</span></li>
+                      {% has_module_perm request.user "driver" "archive" as can_archive %}
+                      {% if can_archive %}
+                        <li><hr class="dropdown-divider"></li>
+                        {% if driver.employment_status == "ACTIVE" %}
+                          <li>
+                            <form method="post" action="{% url 'drivers:driver_deactivate' uuid=driver.uuid %}" data-confirm="Deactivate {{ driver.get_full_name }}?">
+                              {% csrf_token %}<button type="submit" class="dropdown-item text-danger"><i class="bi bi-slash-circle"></i>Deactivate</button>
+                            </form>
+                          </li>
+                        {% else %}
+                          <li>
+                            <form method="post" action="{% url 'drivers:driver_activate' uuid=driver.uuid %}">
+                              {% csrf_token %}<button type="submit" class="dropdown-item"><i class="bi bi-check-circle"></i>Activate</button>
+                            </form>
+                          </li>
+                        {% endif %}
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% if current_filters.q or current_filters.status or current_filters.client or current_filters.branch or current_filters.vehicle or current_filters.license_status %}
+        {% include "components/empty_state.html" with icon="funnel" title="No drivers match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
+      {% else %}
+        {% include "components/empty_state.html" with icon="person-badge" title="No drivers yet" message="Add your first driver to start managing assignments and fleet operations." action_url=create_url action_label="Add Driver" %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

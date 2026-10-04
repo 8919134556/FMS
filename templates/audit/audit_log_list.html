@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load fms_extras %}
+{% block title %}Audit Logs · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms"><span>Administration</span><i class="bi bi-chevron-right" style="font-size:9px;"></i><span>Audit Logs</span></div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Audit Logs</h1>
+      <p class="page-subtitle">Immutable record of every create, update, and lifecycle change</p>
+    </div>
+  </div>
+
+  <div class="alert alert-secondary d-flex align-items-start gap-2 mb-4">
+    <i class="bi bi-shield-lock mt-1"></i>
+    <div>Entries here are read-only — they can be viewed and exported, but never edited or deleted, including by Super Admins.</div>
+  </div>
+
+  {% include "components/filter_bar.html" with fields=filter_fields reset_url=request.path %}
+
+  <div class="table-card">
+    {% include "components/data_table.html" with title="Activity" count=page_obj.paginator.count %}
+
+    {% if logs %}
+      <div class="table-responsive-fms">
+        <table class="table">
+          <thead>
+            <tr><th>Timestamp</th><th>User</th><th>Action</th><th>Module</th><th>Entity</th><th>IP Address</th></tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+              <tr>
+                <td class="cell-secondary">{{ log.timestamp|date:"M d, Y H:i:s" }}</td>
+                <td class="cell-primary">{{ log.user.get_full_name|default:"System" }}</td>
+                <td>{% include "components/status_badge.html" with status=log.action label=log.get_action_display %}</td>
+                <td class="cell-secondary">{{ log.module }}</td>
+                <td class="cell-secondary">{{ log.entity }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}</td>
+                <td class="cell-secondary">{{ log.ip_address|default:"—" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "components/pagination.html" %}
+    {% else %}
+      {% include "components/empty_state.html" with icon="journal-text" title="No matching activity" message="Try adjusting your filters or date range." %}
+    {% endif %}
+  </div>
+{% endblock %}

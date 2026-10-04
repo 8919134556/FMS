@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit User{% else %}New User{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'accounts_portal:user_list' %}">Users</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.get_full_name }}{% else %}New User{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="person-badge" title="Identity" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.employee_id.label }}</label>
+          {{ form.employee_id }}
+          {% if form.employee_id.errors %}<div class="invalid-feedback d-block">{{ form.employee_id.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.username.label }}</label>
+          {{ form.username }}
+          {% if form.username.errors %}<div class="invalid-feedback d-block">{{ form.username.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.first_name.label }}</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}<div class="invalid-feedback d-block">{{ form.first_name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.middle_name.label }}</label>
+          {{ form.middle_name }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.last_name.label }}</label>
+          {{ form.last_name }}
+          {% if form.last_name.errors %}<div class="invalid-feedback d-block">{{ form.last_name.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="telephone" title="Contact" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label required-mark">{{ form.email.label }}</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label required-mark">{{ form.mobile_number.label }}</label>
+          {{ form.mobile_number }}
+          {% if form.mobile_number.errors %}<div class="invalid-feedback d-block">{{ form.mobile_number.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.alternate_mobile_number.label }}</label>
+          {{ form.alternate_mobile_number }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.address.label }}</label>
+          {{ form.address }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.city.label }}</label>
+          {{ form.city }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.state.label }}</label>
+          {{ form.state }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.country.label }}</label>
+          {{ form.country }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.pincode.label }}</label>
+          {{ form.pincode }}
+          {% if form.pincode.errors %}<div class="invalid-feedback d-block">{{ form.pincode.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="briefcase" title="Employment" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.designation.label }}</label>
+          {{ form.designation }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.department.label }}</label>
+          {{ form.department }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.date_of_joining.label }}</label>
+          {{ form.date_of_joining }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.role.label }}</label>
+          {{ form.role }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.client.label }}</label>
+          {{ form.client }}
+          <div class="form-text">{{ form.client.help_text }}</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.reporting_manager.label }}</label>
+          {{ form.reporting_manager }}
+          {% if form.reporting_manager.errors %}<div class="invalid-feedback d-block">{{ form.reporting_manager.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.gender.label }}</label>
+          {{ form.gender }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.date_of_birth.label }}</label>
+          {{ form.date_of_birth }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.profile_photo.label }}</label>
+          {{ form.profile_photo }}
+          {% if form.profile_photo.errors %}<div class="invalid-feedback d-block">{{ form.profile_photo.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if form.password1 %}
+      <div class="form-section">
+        {% include "components/form_section_header.html" with icon="key" title="Set Password" %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label required-mark">{{ form.password1.label }}</label>
+            {{ form.password1 }}
+            <div class="form-text">{{ form.password1.help_text }}</div>
+            {% if form.password1.errors %}<div class="invalid-feedback d-block">{{ form.password1.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label required-mark">{{ form.password2.label }}</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}<div class="invalid-feedback d-block">{{ form.password2.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'accounts_portal:user_detail' uuid=object.uuid %}{% else %}{% url 'accounts_portal:user_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">
+        {% if object %}Save Changes{% else %}Create User{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

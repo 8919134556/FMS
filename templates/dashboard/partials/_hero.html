@@ -1,0 +1,39 @@
+{% load fms_extras %}
+{% comment %}
+Usage: {% include "dashboard/partials/_hero.html" with eyebrow="Admin Dashboard" title="Fleet Operations" subtitle="..." %}
+Greeting, role chip, live date, plus the date-range / auto-refresh / refresh
+toolbar that static/js/dashboard.js wires up by element id.
+{% endcomment %}
+<section class="dash-hero">
+  <div class="dash-hero-main">
+    <span class="dash-eyebrow">{{ eyebrow }}</span>
+    <h1 class="page-title dash-hero-title">{{ title }}</h1>
+    <p class="dash-hero-greeting">
+      {{ greeting }}, <strong>{{ request.user.get_short_name|default:request.user.username }}</strong>
+      <span class="role-chip"><i class="bi bi-shield-check"></i>{{ request.user.role.name|default:"No role assigned" }}</span>
+    </p>
+    {% if subtitle %}<p class="page-subtitle mb-0">{{ subtitle }}</p>{% endif %}
+  </div>
+  <div class="dash-hero-side">
+    <span class="dash-date"><i class="bi bi-calendar3"></i>{% now "l, F j, Y" %}</span>
+    <div class="dashboard-toolbar">
+      {% if can_view_trip %}
+        <select id="dashboardDateRange" class="form-select form-select-sm" aria-label="Date range">
+          <option value="today" {% if date_range == "today" %}selected{% endif %}>Today</option>
+          <option value="yesterday" {% if date_range == "yesterday" %}selected{% endif %}>Yesterday</option>
+          <option value="week" {% if date_range == "week" %}selected{% endif %}>This Week</option>
+          <option value="month" {% if date_range == "month" %}selected{% endif %}>This Month</option>
+        </select>
+      {% endif %}
+      <select id="dashboardAutoRefresh" class="form-select form-select-sm" aria-label="Auto refresh">
+        <option value="0">Auto-refresh: Off</option>
+        <option value="30000">Every 30s</option>
+        <option value="60000">Every 60s</option>
+        <option value="300000">Every 5 min</option>
+      </select>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="dashboardRefreshBtn">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+  </div>
+</section>

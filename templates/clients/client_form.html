@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Client{% else %}New Client{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'clients:client_list' %}">Clients</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.client_name }}{% else %}New Client{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="building" title="Basic Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.client_code.label }}</label>
+          {{ form.client_code }}
+          {% if form.client_code.errors %}<div class="invalid-feedback d-block">{{ form.client_code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.client_name.label }}</label>
+          {{ form.client_name }}
+          {% if form.client_name.errors %}<div class="invalid-feedback d-block">{{ form.client_name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.legal_name.label }}</label>
+          {{ form.legal_name }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.client_type.label }}</label>
+          {{ form.client_type }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.industry.label }}</label>
+          {{ form.industry }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="telephone" title="Contact" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.email.label }}</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.phone.label }}</label>
+          {{ form.phone }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="geo-alt" title="Address" %}
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">{{ form.address_line_1.label }}</label>
+          {{ form.address_line_1 }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.city.label }}</label>
+          {{ form.city }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.state.label }}</label>
+          {{ form.state }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.country.label }}</label>
+          {{ form.country }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ form.pincode.label }}</label>
+          {{ form.pincode }}
+          {% if form.pincode.errors %}<div class="invalid-feedback d-block">{{ form.pincode.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="person-badge" title="Account" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.account_manager.label }}</label>
+          {{ form.account_manager }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.notes.label }}</label>
+          {{ form.notes }}
+        </div>
+      </div>
+      <p class="text-small text-muted-fms mt-2 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Sites, contracts, and vehicle/driver allocation are managed from the client's detail page, not this form.
+      </p>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'clients:client_detail' uuid=object.uuid %}{% else %}{% url 'clients:client_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Client…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Client{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

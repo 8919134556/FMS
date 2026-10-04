@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Route{% else %}New Route{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'routes:route_list' %}">Routes</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+  </div>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{% if object %}Edit {{ object.name }}{% else %}New Route{% endif %}</h1>
+      <p class="page-subtitle">Fields marked <span class="text-danger">*</span> are required</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="signpost-split" title="Basic Information" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.code.label }}</label>
+          {{ form.code }}
+          {% if form.code.errors %}<div class="invalid-feedback d-block">{{ form.code.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required-mark">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.client.label }}</label>
+          {{ form.client }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="rulers" title="Estimates" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">{{ form.estimated_distance_km.label }}</label>
+          {{ form.estimated_distance_km }}
+          <div class="form-text">km</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.estimated_duration_minutes.label }}</label>
+          {{ form.estimated_duration_minutes }}
+          <div class="form-text">minutes</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="geo-alt" title="Stops (optional)" %}
+      {{ stops_formset.management_form }}
+      <div class="table-responsive-fms" id="stopsFormsetTable">
+        <table class="table">
+          <thead><tr><th style="width:90px;">Order</th><th>Site</th><th>Notes</th><th></th></tr></thead>
+          <tbody>
+            {% for stop_form in stops_formset %}
+              <tr class="stop-form-row">
+                {% for hidden in stop_form.hidden_fields %}{{ hidden }}{% endfor %}
+                <td>{{ stop_form.sequence }}{% if stop_form.sequence.errors %}<div class="invalid-feedback d-block">{{ stop_form.sequence.errors|join:", " }}</div>{% endif %}</td>
+                <td>{{ stop_form.site }}{% if stop_form.site.errors %}<div class="invalid-feedback d-block">{{ stop_form.site.errors|join:", " }}</div>{% endif %}</td>
+                <td>{{ stop_form.notes }}</td>
+                <td>{% if stop_form.DELETE %}<div class="form-check">{{ stop_form.DELETE }}<label class="form-check-label text-small">Remove</label></div>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-small text-muted-fms mb-0"><i class="bi bi-info-circle me-1"></i>Stops are optional — a route can be just a name and estimate used to organize trips.</p>
+    </div>
+
+    <div class="form-actions-sticky">
+      <a href="{% if object %}{% url 'routes:route_detail' uuid=object.uuid %}{% else %}{% url 'routes:route_list' %}{% endif %}"
+         class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-submit-loading="{% if object %}Saving Changes…{% else %}Saving Route…{% endif %}">
+        {% if object %}Save Changes{% else %}Save Route{% endif %}
+      </button>
+    </div>
+  </form>
+{% endblock %}

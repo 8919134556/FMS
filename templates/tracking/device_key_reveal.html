@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Device Key · {{ fms_app_name }}{% endblock %}
+{% block content %}
+  <div class="breadcrumb-fms">
+    <a href="{% url 'tracking:device_list' %}">GPS Devices</a>
+    <i class="bi bi-chevron-right" style="font-size:9px;"></i>
+    <span>{{ device.imei }}</span>
+  </div>
+
+  <div class="card-fms" style="max-width:640px;">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <i class="bi bi-key" style="font-size:1.3rem;color:var(--fms-warning);"></i>
+      <span class="section-title mb-0">Device Ingestion Key</span>
+    </div>
+    <div class="alert alert-warning d-flex align-items-start gap-2">
+      <i class="bi bi-exclamation-triangle mt-1"></i>
+      <div>This key is shown <strong>once</strong> and cannot be retrieved again. Copy it into the device's configuration now — if it's lost, regenerate a new one from the device's detail page.</div>
+    </div>
+    <label class="form-label">Authorization header value</label>
+    <div class="d-flex gap-2">
+      <input type="text" class="form-control" readonly value="DeviceKey {{ device.uuid }}:{{ raw_key }}" onclick="this.select();" style="font-family: var(--fms-font-mono);">
+    </div>
+    <p class="text-small text-muted-fms mt-3 mb-0">
+      Send this exact value as the <code>Authorization</code> header on every request to
+      <code>/api/telematics/ingest/</code>.
+    </p>
+    <div class="mt-4">
+      <a href="{% url 'tracking:device_detail' uuid=device.uuid %}" class="btn btn-primary">Done — I've copied the key</a>
+    </div>
+  </div>
+{% endblock %}
