@@ -32,8 +32,9 @@ def _meta(selection):
         title="Alert Report", subtitle=f"{selection.vehicle_label} · {_span(selection)}",
         period_start=selection.period_start, period_end=min(selection.period_end, timezone.now()),
         period_label=f"{ta.RANGE_LABELS.get(selection.range_key, '')} ({_span(selection)})",
-        filters_label=(f"Vehicle: {selection.vehicle_label} · Alert type: {selection.type_label}"
-                       f" · Severity: {selection.severity_label} · Status: {selection.status_label}"),
+        filters_label=(f"Vehicle: {selection.vehicle_label} · Alert: {selection.type_label}"
+                       f" · Level: {selection.level_label} · Status: {selection.status_label}"
+                       + (f" · Geofence: {selection.geofence.name}" if selection.geofence else "")),
         now=timezone.now(), tz=selection.tz, vehicles=[],
     )
 
@@ -41,8 +42,8 @@ def _meta(selection):
 def _summary_rows(totals):
     rows = [("Alerts", f"{totals['matching']:,}")]
     rows += [(f"{label} alerts", f"{totals['by_type'].get(key, 0):,}") for key, label in ar.TYPE_CHOICES]
-    rows += [(f"{label} severity", f"{n:,}") for key, label in ar.SEVERITY_CHOICES
-             if (n := totals["by_severity"].get(key, 0))]
+    rows += [(f"Level: {label}", f"{n:,}") for key, label in ar.LEVEL_CHOICES
+             if (n := totals["by_level"].get(key, 0))]
     rows += [
         ("New (not yet acknowledged)", f"{totals['open']:,}"),
         ("Acknowledged", f"{totals['acknowledged']:,}"),
@@ -88,9 +89,9 @@ def alert_report_pdf(selection):
     ]
     story += [pdf.section("1. Summary"), pdf.kpi_grid(cards, cols=4)]
 
-    headers = ["#", "Date", "Time", "Vehicle", "Driver", "Alert", "Severity", "Duration", "Location", "Speed",
-               "Voltage", "Status"]
-    widths = [0.35, 0.8, 0.6, 0.95, 0.95, 0.5, 0.6, 0.65, 3.05, 0.65, 0.55, 0.8]
+    headers = ["#", "Date", "Time", "Vehicle", "Driver", "Alert", "Level", "Duration", "Geofence", "Location",
+               "Speed", "Voltage", "Status"]
+    widths = [0.35, 0.8, 0.6, 0.95, 0.95, 0.75, 0.6, 0.65, 0.9, 2.3, 0.85, 0.55, 0.8]
     rows = []
     for i, alert in enumerate(ar.iter_alerts(selection), start=1):
         location = alert.location or (
@@ -100,12 +101,14 @@ def alert_report_pdf(selection):
             alert.vehicle.registration_number if alert.vehicle_id else DASH,
             alert.driver.get_full_name() if alert.driver_id else DASH,
             alert.get_category_display(), alert.get_severity_display(),
-            ar.duration_text(ar.duration_seconds(alert)) or DASH, location,
-            _num(alert.speed, 1, " km/h"), _num(alert.voltage, 2, " V"), _status_text(alert),
+            ar.duration_text(ar.duration_seconds(alert)) or DASH,
+            (g.name if (g := ar.alert_geofence(alert)) else DASH), location,
+            _num(alert.speed, 1, " km/h") + (f" (limit {alert.speed_limit})" if alert.speed_limit else ""),
+            _num(alert.voltage, 2, " V"), _status_text(alert),
         ])
     story.append(pdf.section("2. Alerts", f"{len(rows):,} alert(s), oldest first."))
     if rows:
-        story.append(pdf.table(headers, rows, widths, align_right=[0, 7, 9, 10], wrap=[8], dense=True))
+        story.append(pdf.table(headers, rows, widths, align_right=[0, 7, 10, 11], wrap=[5, 8, 9], dense=True))
     else:
         story.append(pdf.p("No alerts match this selection."))
     return pdf.build(story)
@@ -122,8 +125,8 @@ _XL_COLUMNS = [
     ("Vehicle ID", None, 14, lambda a, tz: (a.vehicle.vehicle_code or None) if a.vehicle_id else None),
     ("Client", None, 22, lambda a, tz: a.client.client_name if a.client_id else None),
     ("Driver", None, 20, lambda a, tz: a.driver.get_full_name() if a.driver_id else None),
-    ("Alert type", None, 12, lambda a, tz: a.get_category_display()),
-    ("Severity", None, 10, lambda a, tz: a.get_severity_display()),
+    ("Alert", None, 12, lambda a, tz: a.get_category_display()),
+    ("Level", None, 10, lambda a, tz: a.get_severity_display()),
     ("Start time", FMT_DT, 20, lambda a, tz: _xl_dt(a.occurred_at, tz) if a.occurred_at else None),
     ("Alert time", FMT_DT, 20, lambda a, tz: _xl_dt(a.triggered_at or a.occurred_at, tz) if a.occurred_at else None),
     ("End time", FMT_DT, 20, lambda a, tz: _xl_dt(a.signal_cleared_at, tz) if a.signal_cleared_at else None),
@@ -131,8 +134,10 @@ _XL_COLUMNS = [
     ("Duration (s)", FMT_INT, 11, lambda a, tz: ar.duration_seconds(a)),
     ("Latitude", FMT_COORD, 12, lambda a, tz: float(a.latitude) if a.latitude is not None else None),
     ("Longitude", FMT_COORD, 12, lambda a, tz: float(a.longitude) if a.longitude is not None else None),
+    ("Geofence", None, 22, lambda a, tz: g.name if (g := ar.alert_geofence(a)) else None),
     ("Location", None, 60, lambda a, tz: a.location or None),
     ("Speed (km/h)", "0.0", 11, lambda a, tz: float(a.speed) if a.speed is not None else None),
+    ("Speed limit (km/h)", FMT_INT, 12, lambda a, tz: a.speed_limit),
     ("Voltage (V)", "0.00", 11, lambda a, tz: float(a.voltage) if a.voltage is not None else None),
     ("Ignition", None, 9, lambda a, tz: {True: "On", False: "Off"}.get(a.ignition)),
     ("Odometer (km)", "#,##0.0", 13, lambda a, tz: float(a.odometer) if a.odometer is not None else None),

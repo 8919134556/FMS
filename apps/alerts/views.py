@@ -36,7 +36,8 @@ class AlertReportView(ModulePermissionRequiredMixin, TemplateView):
         context["max_custom_range_days"] = trip_report.MAX_CUSTOM_RANGE_DAYS
         context["vehicles"] = list(report.report_vehicles(self.request.user).values("uuid", "registration_number"))
         context["alert_types"] = report.TYPE_CHOICES
-        context["severities"] = report.SEVERITY_CHOICES
+        context["levels"] = report.LEVEL_CHOICES
+        context["geofences"] = list(report.report_geofences(self.request.user).values("uuid", "name"))
         context["page_sizes"] = report.PAGE_SIZES
         context["can_update"] = user_has_permission(self.request.user, "alert", "update")
         return context

@@ -36,6 +36,16 @@
 
   const CONNECTION_TOKEN = { ONLINE: "--fms-success", STALE: "--fms-warning", OFFLINE: "--fms-text-muted" };
 
+  // Geofence layer: one fixed colour per geofence TYPE (design-system tokens,
+  // the same in the legend) — never random.
+  const GEOFENCE_TYPE_TOKEN = {
+    ENTRY: "--fms-success", EXIT: "--fms-warning", SPEED_LIMIT: "--fms-danger", ENTRY_AND_EXIT: "--fms-purple",
+  };
+  const GEOFENCE_STORAGE_KEY = "fms.liveTracking.geofences";
+  // Geofences change rarely; they refresh on their own slow cycle, never with
+  // the vehicle feed, and are only redrawn when the data actually changed.
+  const GEOFENCE_REFRESH_MS = 30000;
+
   // Real states only — there is no "STOPPED" bucket in the backend data
   // model (only connection_status ONLINE/STALE/OFFLINE and movement_state
   // MOVING/IDLE/null), so the filter bar exposes exactly those, never an
@@ -68,6 +78,10 @@
     firstLoadDone: false,
     // Live Map popup (one vehicle): its own short-lived Leaflet map.
     liveMap: { uuid: null, map: null, marker: null, lastTimestamp: null },
+    // Geofence layer group (shown/hidden as a whole by the Geofences toggle).
+    geofenceLayer: null,
+    geofenceSignature: null,
+    geofencesVisible: true,
   };
 
   function cssVar(name) {
@@ -98,6 +112,25 @@
   // The table's Odometer column: the device's own odometer reading exactly as
   // stored (VehicleCurrentTelemetry.odometer, refreshed on every poll) — never
   // a derived/daily distance. Missing or unparsable values render as "—".
+  // Main Power column: the external (main) power voltage from comms
+  // (mainpower = externalvoltage / 1000). The state (DISCONNECTED / LOW /
+  // NORMAL) comes from the server — the voltage ranges live only in
+  // apps.alerts.events.main_power_state.
+  function mainPowerHtml(vehicle) {
+    const volts = parseFloat(vehicle.main_power);
+    if (vehicle.main_power === null || vehicle.main_power === undefined || Number.isNaN(volts)) {
+      return '<span class="text-muted-fms">—</span>';
+    }
+    const text = `${volts.toFixed(2)} V`;
+    if (vehicle.main_power_state === "DISCONNECTED") {
+      return `<span class="main-power is-off" title="Main power disconnected"><i class="bi bi-plug me-1" aria-hidden="true"></i>${text} · Disconnected</span>`;
+    }
+    if (vehicle.main_power_state === "LOW") {
+      return `<span class="main-power is-low" title="Low voltage"><i class="bi bi-battery-half me-1" aria-hidden="true"></i>${text} · Low</span>`;
+    }
+    return `<span class="main-power is-on"><i class="bi bi-plug-fill me-1" aria-hidden="true"></i>${text}</span>`;
+  }
+
   function deviceOdometerText(vehicle) {
     const km = parseFloat(vehicle.odometer);
     if (vehicle.odometer === null || vehicle.odometer === undefined || Number.isNaN(km)) return "—";
@@ -133,30 +166,107 @@
     state.map = L.map("liveMap", { zoomControl: false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
     L.control.zoom({ position: "bottomleft" }).addTo(state.map);
     FmsMap.addTileLayer(state.map);
-    loadGeofences();
+    initGeofences();
+  }
+
+  /* ---------------- Geofence layer ----------------
+   * Active geofences the viewer may see (server-scoped), drawn in one
+   * Leaflet layer group on the overlay pane — below the vehicle markers,
+   * which stay on the marker pane and keep working inside any geofence.
+   * The Geofences toggle only adds/removes this group from the map: it is
+   * purely visual (monitoring and alerts run on the server regardless).
+   * A 403 or network error just means no geofences are drawn.
+   */
+  function geofenceDetailsHtml(g) {
+    const rows = [
+      `<div class="geofence-tip-title">${escapeHtml(g.name)}</div>`,
+      `<div><span class="cell-secondary">Type:</span> ${escapeHtml(g.type_name || g.type_label || "")}</div>`,
+      g.type === "SPEED_LIMIT" && g.speed_limit_kmh
+        ? `<div><span class="cell-secondary">Speed Limit:</span> <strong>${escapeHtml(g.speed_limit_kmh)} km/h</strong></div>` : "",
+      `<div><span class="cell-secondary">Status:</span> ${escapeHtml(g.status || "Active")}</div>`,
+      `<div><span class="cell-secondary">Assigned Vehicles:</span> ${escapeHtml(g.assigned_vehicles ?? 0)}</div>`,
+    ];
+    return `<div class="geofence-tip">${rows.join("")}</div>`;
+  }
+
+  function geofenceShape(g) {
+    const color = cssVar(GEOFENCE_TYPE_TOKEN[g.type] || "--fms-info");
+    const style = { color, fillColor: color, weight: 2, opacity: 0.9, fillOpacity: 0.1 };
+    const layer = g.shape === "POLYGON" && g.polygon && g.polygon.length >= 3
+      ? L.polygon(g.polygon, style)
+      : L.circle([parseFloat(g.latitude), parseFloat(g.longitude)], { ...style, radius: g.radius_meters });
+    const html = geofenceDetailsHtml(g);
+    // Hover: details only. Click: the same details in a small popup — no navigation.
+    layer.bindTooltip(html, { sticky: true, direction: "top", className: "geofence-tooltip", opacity: 1 });
+    layer.bindPopup(html, { className: "geofence-popup", closeButton: true, autoPan: false });
+    layer.on("mouseover", () => layer.setStyle({ weight: 3, fillOpacity: 0.2 }));
+    layer.on("mouseout", () => layer.setStyle({ weight: 2, fillOpacity: 0.1 }));
+    return layer;
+  }
+
+  function renderGeofences(results) {
+    const signature = JSON.stringify(results);
+    if (signature === state.geofenceSignature) return; // unchanged: keep the existing layers untouched
+    state.geofenceSignature = signature;
+    state.geofenceLayer.clearLayers();
+    results.forEach((g) => state.geofenceLayer.addLayer(geofenceShape(g)));
+    const counts = { ENTRY: 0, EXIT: 0, SPEED_LIMIT: 0, ENTRY_AND_EXIT: 0 };
+    results.forEach((g) => { if (g.type in counts) counts[g.type] += 1; });
+    document.querySelectorAll("[data-geofence-count]").forEach((el) => {
+      el.textContent = counts[el.dataset.geofenceCount] || 0;
+    });
+    updateGeofenceUi(results.length);
   }
 
   function loadGeofences() {
-    // Static boundary reference data, not live telemetry — fetched once
-    // per page load (geofences don't move), not on the refresh interval.
-    // A 403 (viewer lacks "geofence" view) or network error just means no
-    // overlay is drawn — never breaks the vehicle map itself.
-    if (!GEOFENCES_URL || !state.map) return;
-    fetch(GEOFENCES_URL, { headers: { Accept: "application/json" } })
+    if (!GEOFENCES_URL || !state.map || !state.geofenceLayer) return;
+    fetch(GEOFENCES_URL, { headers: { Accept: "application/json" }, cache: "no-store" })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => {
-        data.results.forEach((geofence) => {
-          L.circle([parseFloat(geofence.latitude), parseFloat(geofence.longitude)], {
-            radius: geofence.radius_meters,
-            color: cssVar("--fms-info"),
-            weight: 1.5,
-            fillOpacity: 0.08,
-          })
-            .bindTooltip(geofence.name, { direction: "top" })
-            .addTo(state.map);
-        });
-      })
+      .then((data) => renderGeofences(data.results || []))
       .catch(() => {});
+  }
+
+  function updateGeofenceUi(total) {
+    const btn = document.getElementById("liveGeofenceToggle");
+    const legend = document.getElementById("liveGeofenceLegend");
+    if (!btn) return;
+    const count = total ?? state.geofenceLayer.getLayers().length;
+    btn.setAttribute("aria-pressed", String(state.geofencesVisible));
+    btn.classList.toggle("is-on", state.geofencesVisible);
+    btn.title = state.geofencesVisible ? "Hide geofences" : "Show geofences";
+    btn.querySelector("i").className = `bi ${state.geofencesVisible ? "bi-eye" : "bi-eye-slash"}`;
+    btn.querySelector("[data-geofence-state]").textContent = state.geofencesVisible ? "ON" : "OFF";
+    if (legend) legend.classList.toggle("d-none", !state.geofencesVisible || count === 0);
+  }
+
+  function setGeofencesVisible(visible) {
+    state.geofencesVisible = visible;
+    try {
+      localStorage.setItem(GEOFENCE_STORAGE_KEY, visible ? "on" : "off");
+    } catch (unavailable) {
+      /* private mode — the choice just won't persist */
+    }
+    if (visible) state.geofenceLayer.addTo(state.map);
+    else state.map.removeLayer(state.geofenceLayer);
+    updateGeofenceUi();
+  }
+
+  function initGeofences() {
+    if (!GEOFENCES_URL || !state.map) return;
+    try {
+      state.geofencesVisible = localStorage.getItem(GEOFENCE_STORAGE_KEY) !== "off";
+    } catch (unavailable) {
+      state.geofencesVisible = true;
+    }
+    state.geofenceLayer = L.featureGroup();
+    if (state.geofencesVisible) state.geofenceLayer.addTo(state.map);
+    document.getElementById("liveGeofenceToggle")?.addEventListener("click", () => setGeofencesVisible(!state.geofencesVisible));
+    updateGeofenceUi(0);
+    loadGeofences();
+    // Created / edited / deactivated geofences appear without a page reload.
+    const timerId = window.setInterval(() => { if (!document.hidden) loadGeofences(); }, GEOFENCE_REFRESH_MS);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) loadGeofences(); });
+    window.addEventListener("pagehide", () => window.clearInterval(timerId));
   }
 
   function iconFor(vehicle) {
@@ -532,6 +642,7 @@
             <td class="cell-secondary" title="${escapeHtml(timeAgo(vehicle.timestamp))}">${escapeHtml(trackTime(vehicle.timestamp))}</td>
             <td>${speedText}</td>
             <td>${escapeHtml(deviceOdometerText(vehicle))}</td>
+            <td class="text-nowrap">${mainPowerHtml(vehicle)}</td>
             <td class="cell-location">${locationHtml(vehicle)}</td>
             <td>${connectionBadgeHtml(vehicle.connection_status)}</td>
             <td class="live-map-cell">
@@ -664,6 +775,7 @@
       ${row("Location", vehicle.location ? escapeHtml(vehicle.location) : '<span class="text-muted-fms">—</span>')}
       ${row("Speed", vehicle.speed !== null && vehicle.speed !== undefined ? `${escapeHtml(vehicle.speed)} km/h` : "—")}
       ${row("Odometer", escapeHtml(deviceOdometerText(vehicle)))}
+      ${row("Main power", mainPowerHtml(vehicle))}
       ${row("Ignition", ignitionHtml(vehicle.ignition))}
       ${row("Last update", `${escapeHtml(trackTime(vehicle.timestamp))}<div class="cell-secondary">${escapeHtml(timeAgo(vehicle.timestamp))}</div>`)}
       ${row("Coordinates", `${parseFloat(vehicle.latitude).toFixed(5)}, ${parseFloat(vehicle.longitude).toFixed(5)}`)}

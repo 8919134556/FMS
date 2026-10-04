@@ -1,5 +1,9 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{% if object %}Edit Geofence{% else %}New Geofence{% endif %} · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+{% endblock %}
 {% block content %}
   <div class="breadcrumb-fms">
     <a href="{% url 'geofences:geofence_list' %}">Geofences</a>
@@ -13,7 +17,7 @@
     </div>
   </div>
 
-  <form method="post" novalidate>
+  <form method="post" novalidate id="geofenceForm">
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
 
@@ -21,71 +25,135 @@
       {% include "components/form_section_header.html" with icon="pin-map" title="Basic Information" %}
       <div class="row g-3">
         <div class="col-md-4">
-          <label class="form-label required-mark">{{ form.code.label }}</label>
+          <label class="form-label required-mark" for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
           {{ form.code }}
           {% if form.code.errors %}<div class="invalid-feedback d-block">{{ form.code.errors|join:", " }}</div>{% endif %}
         </div>
         <div class="col-md-4">
-          <label class="form-label required-mark">{{ form.name.label }}</label>
+          <label class="form-label required-mark" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
           {{ form.name }}
           {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
         </div>
         <div class="col-md-4">
-          <label class="form-label">{{ form.status.label }}</label>
+          <label class="form-label" for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
           {{ form.status }}
         </div>
         <div class="col-12">
-          <label class="form-label">{{ form.description.label }}</label>
+          <label class="form-label" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
           {{ form.description }}
         </div>
       </div>
     </div>
 
+    {# ---------------- Type: Entry / Exit / Speed Limit ---------------- #}
     <div class="form-section">
-      {% include "components/form_section_header.html" with icon="geo-alt" title="Boundary" %}
-      <div class="row g-3">
+      {% include "components/form_section_header.html" with icon="bell" title="Geofence Type" %}
+      <div class="row g-3 align-items-start">
         <div class="col-md-4">
-          <label class="form-label required-mark">{{ form.center_latitude.label }}</label>
-          {{ form.center_latitude }}
-          {% if form.center_latitude.errors %}<div class="invalid-feedback d-block">{{ form.center_latitude.errors|join:", " }}</div>{% endif %}
+          <span class="form-label required-mark d-block" id="gfTypeLabel">Geofence Type</span>
+          <div class="geofence-type-options" role="radiogroup" aria-labelledby="gfTypeLabel">
+            {% for radio in form.geofence_type %}
+              <label class="geofence-type-option">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>
+            {% endfor %}
+          </div>
+          {% if form.geofence_type.errors %}<div class="invalid-feedback d-block">{{ form.geofence_type.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-4 {% if form.geofence_type.value != 'SPEED_LIMIT' %}d-none{% endif %}" id="gfSpeedLimitField">
+          <label class="form-label required-mark" for="{{ form.speed_limit_kmh.id_for_label }}">Speed Limit</label>
+          <div class="input-group">
+            {{ form.speed_limit_kmh }}
+            <span class="input-group-text" style="font-size: var(--fms-text-small);">km/h</span>
+          </div>
+          {% if form.speed_limit_kmh.errors %}<div class="invalid-feedback d-block">{{ form.speed_limit_kmh.errors|join:", " }}</div>{% endif %}
         </div>
         <div class="col-md-4">
-          <label class="form-label required-mark">{{ form.center_longitude.label }}</label>
-          {{ form.center_longitude }}
-          {% if form.center_longitude.errors %}<div class="invalid-feedback d-block">{{ form.center_longitude.errors|join:", " }}</div>{% endif %}
-        </div>
-        <div class="col-md-4">
-          <label class="form-label required-mark">{{ form.radius_meters.label }}</label>
-          {{ form.radius_meters }}
-          {% if form.radius_meters.errors %}<div class="invalid-feedback d-block">{{ form.radius_meters.errors|join:", " }}</div>{% endif %}
+          <p class="text-small text-muted-fms mb-0 mt-md-4" id="gfTypeHelp"
+             data-entry="Alert (Medium) when an assigned vehicle enters this geofence."
+             data-exit="Alert (Medium) when an assigned vehicle leaves this geofence."
+             data-speed="While an assigned vehicle is inside, alert (High) when it goes faster than the speed limit."
+             data-both="Alert (Medium) both when an assigned vehicle enters and when it leaves this geofence."></p>
         </div>
       </div>
+    </div>
+
+    {# ---------------- Boundary: circle or polygon, drawn on the map ---------------- #}
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="geo-alt" title="Geofence Area" %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label required-mark" for="{{ form.shape.id_for_label }}">Geofence Shape</label>
+          {{ form.shape }}
+        </div>
+        <div class="col-md-8">
+          <p class="text-small text-muted-fms mb-0 mt-md-4" id="gfMapHelp"
+             data-circle="Click the map to place the center, then set the radius."
+             data-polygon="Click the map to add corners (at least 3). Drag a corner to move it."></p>
+        </div>
+      </div>
+      <div class="geofence-editor mt-3">
+        <div id="gfMap" class="geofence-map" aria-label="Geofence map editor"></div>
+        <div class="geofence-editor-tools">
+          <div class="gf-circle-fields">
+            <div class="row g-2">
+              <div class="col-sm-4">
+                <label class="form-label" for="{{ form.center_latitude.id_for_label }}">Center latitude</label>
+                {{ form.center_latitude }}
+                {% if form.center_latitude.errors %}<div class="invalid-feedback d-block">{{ form.center_latitude.errors|join:", " }}</div>{% endif %}
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label" for="{{ form.center_longitude.id_for_label }}">Center longitude</label>
+                {{ form.center_longitude }}
+                {% if form.center_longitude.errors %}<div class="invalid-feedback d-block">{{ form.center_longitude.errors|join:", " }}</div>{% endif %}
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label" for="{{ form.radius_meters.id_for_label }}">Radius (m)</label>
+                {{ form.radius_meters }}
+                {% if form.radius_meters.errors %}<div class="invalid-feedback d-block">{{ form.radius_meters.errors|join:", " }}</div>{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="gf-polygon-fields d-none">
+            <span class="text-small" id="gfPointCount">0 points</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="gfUndoPoint"><i class="bi bi-arrow-counterclockwise me-1"></i>Undo point</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="gfClearPolygon"><i class="bi bi-trash me-1"></i>Clear</button>
+          </div>
+          {{ form.polygon_points }}
+        </div>
+      </div>
+    </div>
+
+    {# ---------------- Assigned vehicles ---------------- #}
+    <div class="form-section">
+      {% include "components/form_section_header.html" with icon="truck" title="Assigned Vehicles" %}
+      <p class="text-small text-muted-fms">Only assigned vehicles are monitored against this geofence.</p>
+      <div class="geofence-vehicle-tools mb-2">
+        <input type="search" class="form-control form-control-sm" id="gfVehicleSearch" placeholder="Search vehicles…" aria-label="Search vehicles">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="gfSelectAll">Select shown</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="gfSelectNone">Clear</button>
+        <span class="text-small text-muted-fms" id="gfVehicleCount"></span>
+      </div>
+      <div class="geofence-vehicle-list" id="gfVehicleList">
+        {% for checkbox in form.vehicles %}
+          <label class="geofence-vehicle-item" data-name="{{ checkbox.choice_label|lower }}">
+            {{ checkbox.tag }}<span>{{ checkbox.choice_label }}</span>
+          </label>
+        {% empty %}
+          <p class="text-small text-muted-fms mb-0">No vehicles available.</p>
+        {% endfor %}
+      </div>
+      {% if form.vehicles.errors %}<div class="invalid-feedback d-block">{{ form.vehicles.errors|join:", " }}</div>{% endif %}
     </div>
 
     <div class="form-section">
       {% include "components/form_section_header.html" with icon="diagram-3" title="Ownership / Context" %}
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">{{ form.site.label }}</label>
+          <label class="form-label" for="{{ form.site.id_for_label }}">{{ form.site.label }}</label>
           {{ form.site }}
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ form.branch.label }}</label>
+          <label class="form-label" for="{{ form.branch.id_for_label }}">{{ form.branch.label }}</label>
           {{ form.branch }}
-        </div>
-      </div>
-    </div>
-
-    <div class="form-section">
-      {% include "components/form_section_header.html" with icon="bell" title="Notifications" %}
-      <div class="row g-3">
-        <div class="col-md-6 form-check">
-          {{ form.notify_on_enter }}
-          <label class="form-check-label" for="{{ form.notify_on_enter.id_for_label }}">{{ form.notify_on_enter.label }}</label>
-        </div>
-        <div class="col-md-6 form-check">
-          {{ form.notify_on_exit }}
-          <label class="form-check-label" for="{{ form.notify_on_exit.id_for_label }}">{{ form.notify_on_exit.label }}</label>
         </div>
       </div>
     </div>
@@ -98,4 +166,9 @@
       </button>
     </div>
   </form>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'js/fms_map.js' %}"></script>
+  <script src="{% static 'js/geofence_form.js' %}"></script>
 {% endblock %}

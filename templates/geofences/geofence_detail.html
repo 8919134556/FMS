@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% load fms_extras %}
+{% load fms_extras static %}
 {% block title %}{{ geofence.name }} · {{ fms_app_name }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">{% endblock %}
 {% block content %}
   {% has_module_perm request.user "geofence" "update" as can_update %}
   {% has_module_perm request.user "geofence" "archive" as can_archive %}
@@ -22,7 +23,8 @@
           {% include "components/status_badge.html" with status=geofence.status label=geofence.get_status_display %}
         </div>
         <p class="page-subtitle mb-0">
-          {{ geofence.code }} &middot; {{ geofence.radius_meters }} m radius
+          {{ geofence.code }} &middot; {{ geofence.type_summary }} &middot;
+          {% if geofence.shape == "POLYGON" %}Polygon ({{ geofence.polygon|length }} points){% else %}{{ geofence.radius_meters }} m radius{% endif %}
           {% if geofence.site %} &middot; <a href="{% url 'locations:site_detail' uuid=geofence.site.uuid %}">{{ geofence.site.site_name }}</a>{% endif %}
           {% if geofence.branch %} &middot; <a href="{% url 'locations:branch_detail' uuid=geofence.branch.uuid %}">{{ geofence.branch.name }}</a>{% endif %}
         </p>
@@ -52,11 +54,41 @@
 
   <div class="dashboard-kpi-grid mb-3">
     {% include "components/kpi_card.html" with label="Total Crossings" value=event_count icon="arrow-left-right" tone="primary" %}
-    {% include "components/kpi_card.html" with label="Radius" value=geofence.radius_meters icon="rulers" tone="info" %}
+    {% include "components/kpi_card.html" with label="Alerts" value=alert_count icon="bell" tone="warning" %}
+    {% include "components/kpi_card.html" with label="Assigned Vehicles" value=assigned_vehicles|length icon="truck" tone="info" %}
   </div>
 
   <div class="row g-3">
     <div class="col-lg-8">
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Geofence Area</span>
+        <div id="gfDetailMap" class="geofence-detail-map mt-2"></div>
+        {{ geofence_shape_json|json_script:"gfShapeData" }}
+      </div>
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Recent Alerts</span>
+        {% if recent_alerts %}
+          <div class="table-responsive-fms mt-2">
+            <table class="table">
+              <thead><tr><th>Vehicle</th><th>Alert</th><th>Level</th><th>Speed</th><th>When</th><th></th></tr></thead>
+              <tbody>
+                {% for alert in recent_alerts %}
+                  <tr>
+                    <td>{{ alert.vehicle.registration_number }}</td>
+                    <td>{{ alert.get_category_display }}</td>
+                    <td>{{ alert.get_severity_display }}</td>
+                    <td class="cell-secondary">{% if alert.speed is not None %}{{ alert.speed|floatformat:0 }} km/h{% if alert.speed_limit %} (limit {{ alert.speed_limit }}){% endif %}{% else %}—{% endif %}</td>
+                    <td class="cell-secondary">{{ alert.occurred_at|date:"M d, Y H:i:s" }}</td>
+                    <td><a href="{{ alert.link_url }}" class="btn btn-sm btn-outline-primary">View</a></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="bell" title="No alerts yet" message="Entry, exit and speeding alerts for this geofence will appear here." %}
+        {% endif %}
+      </div>
       <div class="card-fms">
         <span class="section-title" style="font-size:.95rem;">Recent Crossings</span>
         {% if recent_events %}
@@ -86,9 +118,26 @@
     </div>
     <div class="col-lg-4">
       <div class="card-fms mb-3">
-        <span class="section-title" style="font-size:.95rem;">Boundary</span>
-        <div class="d-flex justify-content-between mt-2"><span class="cell-secondary">Center</span><span>{{ geofence.center_latitude }}, {{ geofence.center_longitude }}</span></div>
-        <div class="d-flex justify-content-between mt-1"><span class="cell-secondary">Radius</span><span>{{ geofence.radius_meters }} m</span></div>
+        <span class="section-title" style="font-size:.95rem;">Configuration</span>
+        <div class="d-flex justify-content-between mt-2"><span class="cell-secondary">Type</span><span>{{ geofence.get_geofence_type_display }}</span></div>
+        {% if geofence.geofence_type == "SPEED_LIMIT" %}
+          <div class="d-flex justify-content-between mt-1"><span class="cell-secondary">Speed limit</span><span>{{ geofence.speed_limit_kmh }} km/h</span></div>
+        {% endif %}
+        <div class="d-flex justify-content-between mt-1"><span class="cell-secondary">Shape</span><span>{{ geofence.get_shape_display }}</span></div>
+        <div class="d-flex justify-content-between mt-1"><span class="cell-secondary">Center</span><span>{{ geofence.center_latitude }}, {{ geofence.center_longitude }}</span></div>
+        {% if geofence.shape == "CIRCLE" %}
+          <div class="d-flex justify-content-between mt-1"><span class="cell-secondary">Radius</span><span>{{ geofence.radius_meters }} m</span></div>
+        {% endif %}
+      </div>
+      <div class="card-fms mb-3">
+        <span class="section-title" style="font-size:.95rem;">Assigned Vehicles</span>
+        {% if assigned_vehicles %}
+          <div class="d-flex flex-wrap gap-1 mt-2">
+            {% for vehicle in assigned_vehicles %}<span class="status-pill tone-neutral">{{ vehicle.registration_number }}</span>{% endfor %}
+          </div>
+        {% else %}
+          <p class="text-small text-muted-fms mb-0 mt-2">No vehicles assigned — this geofence monitors nothing until vehicles are assigned.</p>
+        {% endif %}
       </div>
       {% if geofence.description %}
         <div class="card-fms mb-3">
@@ -118,4 +167,23 @@
       </div>
     </div>
   </div>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'js/fms_map.js' %}"></script>
+  <script>
+    (() => {
+      const data = JSON.parse(document.getElementById("gfShapeData").textContent);
+      const el = document.getElementById("gfDetailMap");
+      if (!el || typeof L === "undefined") return;
+      const color = getComputedStyle(document.documentElement).getPropertyValue("--fms-primary").trim() || "#2563eb";
+      const map = L.map(el).setView([data.lat, data.lon], 13);
+      FmsMap.addTileLayer(map);
+      const layer = data.shape === "POLYGON" && data.polygon.length >= 3
+        ? L.polygon(data.polygon, { color, weight: 2, fillOpacity: 0.12 })
+        : L.circle([data.lat, data.lon], { radius: data.radius, color, weight: 2, fillOpacity: 0.12 });
+      layer.addTo(map);
+      map.fitBounds(layer.getBounds().pad(0.2));
+    })();
+  </script>
 {% endblock %}

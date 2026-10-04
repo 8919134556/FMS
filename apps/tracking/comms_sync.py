@@ -31,6 +31,8 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from django.conf import settings
 from django.utils import timezone
 
+from apps.alerts.events import device_battery_flags, main_power_flags, power_cut_from_mainpower
+from apps.alerts.overspeed import overspeed_from_eventioval
 from apps.core.utils import display_timezone
 from apps.tracking.models import CommsSyncState, TrackingDevice
 from apps.tracking.providers.base import NormalizedEvent
@@ -48,7 +50,8 @@ DEFAULT_MAX_ROWS = 50000
 DEFAULT_HISTORY_DAYS = 7
 
 _COLUMNS = (
-    "id, unitno, tracktime, lat, lon, speed, direction, ignition, odometer, gpsodometer, gpsstatus, location, panic"
+    "id, unitno, tracktime, lat, lon, speed, direction, ignition, odometer, gpsodometer, gpsstatus, location, panic, eventioval, mainpower, "
+    "device_battery_voltage"
 )
 
 # analog1 (mV) of the panic readings, from the comms Raw DB — the value the App
@@ -111,6 +114,15 @@ def row_to_event(row, tz):
       is kept, unchanged, in ``metadata["panic"]`` — the input of
       apps.alerts.events. NULL (rows from before comms computed it) is omitted.
       ``panic_voltage`` (analog1 in volts) is added when the Raw DB was read.
+    * ``mainpower`` (V) is kept in ``metadata`` with its ``power_cut`` (< 5 V)
+      and ``low_voltage`` (5 V to < 8.5 V) flags for the Main Power
+      Disconnected / Low Voltage alerts; ``external_power`` is set from it
+      (connected = not in the disconnected range).
+    * ``device_battery_voltage`` (V, comms batteryvoltage / 1000) is kept in
+      ``metadata`` with ``battery_cut`` (< 2 V) / ``battery_low`` (2 to < 3 V)
+      for the Device Battery alerts — an alert input only, never displayed.
+    * ``eventioval`` (the device's triggering event id) becomes ``overspeed``
+      (1 when 255, else 0) via apps.alerts.overspeed; the raw id is not stored.
     """
     tracktime, lat, lon = row.get("tracktime"), row.get("lat"), row.get("lon")
     if tracktime is None or lat is None or lon is None:
@@ -126,6 +138,7 @@ def row_to_event(row, tz):
         heading = None
 
     odometer_m = row.get("odometer")
+    power_cut = power_cut_from_mainpower(row.get("mainpower"))
     gps_odometer_m = row.get("gpsodometer")
     return NormalizedEvent(
         timestamp=tracktime,
@@ -135,6 +148,7 @@ def row_to_event(row, tz):
         heading=heading,
         ignition=None if row.get("ignition") is None else bool(row["ignition"]),
         odometer=_decimal(Decimal(str(odometer_m)) / Decimal(1000), 1) if odometer_m is not None else None,
+        external_power=None if power_cut is None else power_cut == 0,
         metadata={
             "source": "comms",
             "comms_id": row.get("id"),
@@ -147,6 +161,18 @@ def row_to_event(row, tz):
             "location": row.get("location") or "",
             **({} if row.get("panic") is None else {"panic": int(row["panic"])}),
             **({} if row.get("panic_voltage") is None else {"panic_voltage": row["panic_voltage"]}),
+            # eventioval 255 -> overspeed 1 (apps.alerts.overspeed owns the mapping); eventioval itself is not kept.
+            **({} if (overspeed := overspeed_from_eventioval(row.get("eventioval"))) is None
+               else {"overspeed": overspeed}),
+            # mainpower (V) is kept, with its power_cut / low_voltage flags
+            # (apps.alerts.events.main_power_state owns the voltage ranges).
+            **({} if row.get("mainpower") is None else {"mainpower": float(row["mainpower"])}),
+            **main_power_flags(row.get("mainpower")),
+            # Device battery voltage (V): an alert input only — kept in metadata for
+            # apps.alerts.events, never in TelemetryEvent.battery_voltage / Live Tracking.
+            **({} if row.get("device_battery_voltage") is None
+               else {"device_battery_voltage": float(row["device_battery_voltage"])}),
+            **device_battery_flags(row.get("device_battery_voltage")),
         },
     )
 
@@ -290,9 +316,10 @@ def sync(*, dsn=None, history_days=DEFAULT_HISTORY_DAYS, batch_size=DEFAULT_BATC
 
 
 def backfill_panic_flags(*, days, dsn=None, connection=None):
-    """For history imported BEFORE the bridge carried ``panic``: copy the comms
-    panic flag (and voltage) onto the matching FMS records of the last ``days``
-    days, then rebuild those vehicles' alert events WITHOUT notifying anyone
+    """For history imported BEFORE the bridge carried ``panic`` / ``mainpower``:
+    copy the comms panic flag (and voltage) and main power voltage (and its
+    power_cut flag) onto the matching FMS records of the last ``days`` days,
+    then rebuild those vehicles' Panic and Main Power alerts WITHOUT notifying anyone
     (they are past events). Idempotent. Returns {"updated", "alerts_created"}."""
     from django.db import transaction
 
@@ -307,7 +334,9 @@ def backfill_panic_flags(*, days, dsn=None, connection=None):
     conn = connection or _connect(dsn)
     try:
         rows = conn.execute(
-            f"SELECT {_COLUMNS} FROM history_table WHERE panic IS NOT NULL AND tracktime >= %s ORDER BY tracktime",
+            f"SELECT {_COLUMNS} FROM history_table "
+            "WHERE (panic IS NOT NULL OR mainpower IS NOT NULL OR device_battery_voltage IS NOT NULL) "
+            "AND tracktime >= %s ORDER BY tracktime",
             (cutoff,),
         ).fetchall()
     finally:
@@ -334,10 +363,57 @@ def backfill_panic_flags(*, days, dsn=None, connection=None):
                 metadata = wanted.get((record.timestamp, record.latitude, record.longitude))
                 if metadata is None:
                     continue
-                extra = {k: metadata[k] for k in ("panic", "panic_voltage") if k in metadata}
+                extra = {k: metadata[k] for k in ("panic", "panic_voltage", "mainpower", "power_cut", "low_voltage",
+                                                  "device_battery_voltage", "battery_cut", "battery_low")
+                         if k in metadata}
                 if any(record.metadata.get(k) != v for k, v in extra.items()):
                     record.metadata = {**record.metadata, **extra}
                     record.save(update_fields=["metadata"])
                     updated += 1
             created += len(process_vehicle_signals(vehicle=device.vehicle, device=device, readings=records, notify=False))
+    return {"updated": updated, "alerts_created": created}
+
+
+def backfill_overspeed_flags(*, days, raw_dsn=None):
+    """Over Speeding for history imported before the bridge read ``eventioval``:
+    the comms Raw DB keeps every record's eventioval, so its 255 records of the
+    last ``days`` days are matched to FMS history (device + timestamp), flagged
+    ``overspeed = 1``, and the vehicles' Over Speeding alerts are rebuilt
+    WITHOUT notifying anyone. Idempotent. Returns {"updated", "alerts_created"}."""
+    from django.db import transaction
+
+    from apps.alerts.events import _lock_vehicle
+    from apps.alerts.overspeed import OVERSPEED_EVENT_IO, process_vehicle_overspeed
+    from apps.tracking.models import TelemetryEvent
+
+    raw_dsn = raw_dsn or settings.COMMS_RAW_DATABASE_URL
+    if not raw_dsn:
+        raise RuntimeError("COMMS_RAW_DATABASE_URL is not configured.")
+    tz = _local_timezone()
+    cutoff = datetime.datetime.now(tz).replace(tzinfo=None) - datetime.timedelta(days=days)
+    with _connect(raw_dsn) as raw:
+        rows = raw.execute(
+            "SELECT DISTINCT unitno, tracktime FROM teltonika_raw_table WHERE eventioval = %s AND tracktime >= %s",
+            (OVERSPEED_EVENT_IO, cutoff),
+        ).fetchall()
+    by_unit = defaultdict(set)
+    for row in rows:
+        by_unit[str(row["unitno"]).strip()].add(row["tracktime"].replace(tzinfo=tz))
+    devices = {d.imei: d for d in TrackingDevice.objects.select_related("vehicle").filter(imei__in=list(by_unit))}
+
+    updated = created = 0
+    for unit, times in by_unit.items():
+        device = devices.get(unit)
+        if device is None or device.vehicle is None:
+            continue
+        with transaction.atomic():
+            records = list(TelemetryEvent.objects.filter(device=device, timestamp__in=list(times)))
+            for record in records:
+                if record.metadata.get("overspeed") != 1:
+                    record.metadata = {**record.metadata, "overspeed": 1}
+                    record.save(update_fields=["metadata"])
+                    updated += 1
+            _lock_vehicle(device.vehicle.pk)
+            created += len(process_vehicle_overspeed(vehicle=device.vehicle, device=device, readings=records,
+                                                     notify=False))
     return {"updated": updated, "alerts_created": created}

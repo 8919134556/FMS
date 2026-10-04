@@ -317,6 +317,14 @@ ALERT_NOTIFY_MAX_AGE_MINUTES = env.int("ALERT_NOTIFY_MAX_AGE_MINUTES", default=1
 IDLE_ALERT_MAX_GAP_SECONDS = env.int("IDLE_ALERT_MAX_GAP_SECONDS", default=180)
 # ... and an idle run needs at least this many readings before it can raise an alert.
 IDLE_ALERT_MIN_READINGS = env.int("IDLE_ALERT_MIN_READINGS", default=3)
+# Over Speeding alerts (apps.alerts.overspeed): the device sends an eventioval-255 record at the start
+# and at the end of an overspeed; a start pairs with the next 255 only within this many minutes.
+OVERSPEED_MAX_EPISODE_MINUTES = env.int("OVERSPEED_MAX_EPISODE_MINUTES", default=30)
+# Geofences (apps.geofences.services): a vehicle counts as having LEFT a geofence only once it is this far
+# outside the boundary (GPS jitter on the edge can't flap Entry/Exit) ...
+GEOFENCE_EXIT_TOLERANCE_METERS = env.int("GEOFENCE_EXIT_TOLERANCE_METERS", default=20)
+# ... and a crossing must hold for this many consecutive readings (one GPS jump is not an entry).
+GEOFENCE_CONFIRM_READINGS = env.int("GEOFENCE_CONFIRM_READINGS", default=2)
 
 TELEMATICS_ONLINE_THRESHOLD_MINUTES = env.int("TELEMATICS_ONLINE_THRESHOLD_MINUTES", default=5)
 TELEMATICS_OFFLINE_THRESHOLD_MINUTES = env.int("TELEMATICS_OFFLINE_THRESHOLD_MINUTES", default=30)

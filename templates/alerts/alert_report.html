@@ -42,14 +42,20 @@
     <div class="live-status-bar">
       <div class="live-status-pills" id="alrStatusPills" role="tablist" aria-label="Filter by alert status"></div>
       <div class="live-status-controls">
-        <select id="alrTypeFilter" class="form-select form-select-sm alert-filter-select" aria-label="Alert type">
+        <select id="alrTypeFilter" class="form-select form-select-sm alert-filter-select" aria-label="Alert">
           <option value="">All Alerts</option>
           {% for value, label in alert_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
         </select>
-        <select id="alrSeverityFilter" class="form-select form-select-sm alert-filter-select" aria-label="Severity">
-          <option value="">All Severities</option>
-          {% for value, label in severities %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        <select id="alrLevelFilter" class="form-select form-select-sm alert-filter-select" aria-label="Level">
+          <option value="">All Levels</option>
+          {% for value, label in levels %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
         </select>
+        {% if geofences %}
+          <select id="alrGeofenceFilter" class="form-select form-select-sm alert-filter-select" aria-label="Geofence">
+            <option value="">All Geofences</option>
+            {% for geofence in geofences %}<option value="{{ geofence.uuid }}">{{ geofence.name }}</option>{% endfor %}
+          </select>
+        {% endif %}
         <select id="alrVehicleFilter" class="form-select form-select-sm alert-filter-select" aria-label="Vehicle">
           <option value="">All Vehicles</option>
           {% for vehicle in vehicles %}<option value="{{ vehicle.uuid }}">{{ vehicle.registration_number }}</option>{% endfor %}
@@ -79,12 +85,12 @@
         <table class="table alert-report-table" id="alrTable">
           <thead><tr id="alrHeadRow"></tr></thead>
           <tbody id="alrTableBody">
-            {% include "components/loading.html" with rows=5 cols=9 %}
+            {% include "components/loading.html" with rows=5 cols=10 %}
           </tbody>
         </table>
       </div>
       <div class="d-none" id="alrEmpty">
-        {% include "components/empty_state.html" with icon="bell-slash" title="No alerts" message="No alerts match the selected vehicle, alert type, severity and period." %}
+        {% include "components/empty_state.html" with icon="bell-slash" title="No alerts" message="No alerts match the selected vehicle, alert, level, geofence and period." %}
       </div>
       <nav class="loc-pagination" id="alrPagination" aria-label="Alert pages"></nav>
     </div>

@@ -24,7 +24,8 @@
   const COLUMNS = [
     { key: "time", label: "Time", sort: "time" },
     { key: "vehicle", label: "Vehicle / Driver", sort: "vehicle" },
-    { key: "type", label: "Alert / Severity", sort: "severity" },
+    { key: "type", label: "Alert", sort: "type" },
+    { key: "level", label: "Level", sort: "level" },
     { key: "duration", label: "Duration", num: true },
     { key: "location", label: "Location" },
     { key: "speed", label: "Speed", sort: "speed", num: true },
@@ -40,18 +41,26 @@
     { key: "RESOLVED", label: "Resolved", icon: "bi-check-circle", count: "resolved" },
   ];
   const STATUS_TONES = { OPEN: "tone-danger", ACKNOWLEDGED: "tone-warning", RESOLVED: "tone-success" };
-  // Per alert type: pill tone + icon. A new type falls back to the severity's tone.
+  // Per alert type: pill tone + icon. A new type falls back to its level's tone.
   const TYPE_STYLES = {
     PANIC: { tone: "tone-danger", icon: "bi-exclamation-octagon-fill" },
     IDLE: { tone: "tone-warning", icon: "bi-hourglass-split" },
+    OVER_SPEEDING: { tone: "tone-danger", icon: "bi-speedometer2" },
+    MAIN_POWER_DISCONNECTED: { tone: "tone-danger", icon: "bi-plug" },
+    LOW_VOLTAGE: { tone: "tone-warning", icon: "bi-battery-half" },
+    DEVICE_BATTERY_DISCONNECTED: { tone: "tone-danger", icon: "bi-battery" },
+    DEVICE_BATTERY_LOW_VOLTAGE: { tone: "tone-warning", icon: "bi-battery-half" },
+    GEOFENCE_ENTRY: { tone: "tone-info", icon: "bi-box-arrow-in-right" },
+    GEOFENCE_EXIT: { tone: "tone-info", icon: "bi-box-arrow-right" },
+    GEOFENCE_SPEEDING: { tone: "tone-danger", icon: "bi-sign-stop" },
   };
-  const SEVERITY_TONES = { CRITICAL: "tone-danger", HIGH: "tone-danger", MEDIUM: "tone-warning", LOW: "tone-info" };
+  const LEVEL_TONES = { CRITICAL: "tone-danger", HIGH: "tone-danger", MEDIUM: "tone-warning", LOW: "tone-info" };
 
   const state = {
     rangeControl: null,
     refreshUi: null,
     refresher: null,
-    filters: { vehicle: "", type: "", severity: "", status: "" },
+    filters: { vehicle: "", type: "", level: "", geofence: "", status: "" },
     page: 1,
     pageSize: parseInt(document.getElementById("alrPageSize").value, 10) || 50,
     sort: "time",
@@ -77,6 +86,14 @@
     return `<span class="status-pill ${STATUS_TONES[row.status] || "tone-neutral"}"><span class="dot"></span>${escapeHtml(row.status_label)}</span>`;
   }
 
+  function isBatteryType(type) {
+    return type === "DEVICE_BATTERY_DISCONNECTED" || type === "DEVICE_BATTERY_LOW_VOLTAGE";
+  }
+
+  function levelPill(row) {
+    return `<span class="status-pill alert-level-pill ${LEVEL_TONES[row.level] || "tone-neutral"}"><span class="dot"></span>${escapeHtml(row.level_label)}</span>`;
+  }
+
   function locationText(row) {
     if (row.location) return row.location;
     if (row.latitude !== null) return `${num(row.latitude, 5)}, ${num(row.longitude, 5)}`;
@@ -98,18 +115,21 @@
         return `<span class="fw-semibold">${escapeHtml(row.registration_number)}</span>`
           + `<span class="d-block text-small text-muted-fms">${row.driver ? escapeHtml(row.driver) : "No driver"}</span>`;
       case "type": {
-        const style = TYPE_STYLES[row.type] || { tone: SEVERITY_TONES[row.severity] || "tone-neutral", icon: "bi-bell-fill" };
-        const severityTone = (SEVERITY_TONES[row.severity] || "tone-neutral").replace("tone-", "text-");
+        const style = TYPE_STYLES[row.type] || { tone: LEVEL_TONES[row.level] || "tone-neutral", icon: "bi-bell-fill" };
         return `<span class="status-pill ${style.tone}"><i class="bi ${style.icon} me-1" aria-hidden="true"></i>${escapeHtml(row.type_label)}</span>`
-          + `<span class="d-block text-small mt-1"><span class="fw-semibold ${severityTone}">${escapeHtml(row.severity_label)}</span>`
-          + `${row.signal_active ? ` · <span class="fw-semibold ${row.type === "PANIC" ? "text-danger" : "text-warning"}">active</span>` : ""}</span>`;
+          + (row.geofence ? `<span class="d-block text-small text-muted-fms mt-1"><i class="bi bi-pin-map me-1" aria-hidden="true"></i>${escapeHtml(row.geofence.name)}</span>` : "")
+          + (row.signal_active && !row.geofence ? `<span class="d-block text-small mt-1 fw-semibold ${row.type === "PANIC" ? "text-danger" : "text-warning"}">Active</span>` : "");
       }
+      case "level": return levelPill(row);
       case "duration": return row.duration_text ? `<span class="text-nowrap">${escapeHtml(row.duration_text)}</span>` : DASH;
       case "location": {
         const text = locationText(row);
         return text ? `<span class="trip-location" title="${escapeHtml(text)}">${escapeHtml(text)}</span>` : DASH;
       }
-      case "speed": return row.speed === null ? DASH : `${num(row.speed, 1)} km/h`;
+      case "speed":
+        if (row.speed === null) return DASH;
+        return `${num(row.speed, 1)} km/h`
+          + (row.speed_limit ? `<span class="d-block text-small text-muted-fms">limit ${row.speed_limit}</span>` : "");
       case "voltage": return row.voltage === null ? DASH : `${num(row.voltage, 2)} V`;
       case "status": return statusPill(row);
       case "action":
@@ -124,7 +144,8 @@
     const params = state.rangeControl.appendTo(new URLSearchParams());
     if (state.filters.vehicle) params.set("vehicle", state.filters.vehicle);
     if (state.filters.type) params.set("alert_type", state.filters.type);
-    if (state.filters.severity) params.set("severity", state.filters.severity);
+    if (state.filters.level) params.set("level", state.filters.level);
+    if (state.filters.geofence) params.set("geofence", state.filters.geofence);
     if (state.filters.status) params.set("status", state.filters.status);
     return params;
   }
@@ -286,8 +307,36 @@
     document.getElementById("alrDetailTitle").textContent = `${row.type_label} Alert — ${row.registration_number}`;
     document.getElementById("alrDetailSubtitle").textContent = trackTime(row.occurred_at);
     const isIdle = row.type === "IDLE";
-    const ongoing = `<span class="fw-semibold ${isIdle ? "text-warning" : "text-danger"}">${isIdle ? "Still idling" : "Still active"}</span>`;
-    const lifecycle = isIdle
+    const isOverspeed = row.type === "OVER_SPEEDING";
+    const isBattery = row.type === "DEVICE_BATTERY_DISCONNECTED" || row.type === "DEVICE_BATTERY_LOW_VOLTAGE";
+    const isPower = isBattery || row.type === "MAIN_POWER_DISCONNECTED" || row.type === "LOW_VOLTAGE";
+    const isGeofence = !!row.geofence;
+    const isEntry = row.type === "GEOFENCE_ENTRY";
+    const isGeoSpeed = row.type === "GEOFENCE_SPEEDING";
+    const isLow = row.type === "LOW_VOLTAGE" || row.type === "DEVICE_BATTERY_LOW_VOLTAGE";
+    const ongoing = `<span class="fw-semibold ${isIdle ? "text-warning" : "text-danger"}">${isIdle ? "Still idling" : isOverspeed ? "Still over the limit" : isLow ? "Still low" : isPower ? "Still disconnected" : "Still active"}</span>`;
+    const lifecycle = isGeofence
+      ? [
+        detailRow("Geofence", `<strong>${escapeHtml(row.geofence.name)}</strong>`),
+        detailRow(isEntry ? "Entry time" : isGeoSpeed ? "Speeding from" : "Exit time", escapeHtml(trackTime(row.occurred_at))),
+        detailRow(isEntry ? "Left at" : isGeoSpeed ? "Back under limit" : "Re-entered at",
+          row.signal_active ? `<span class="text-muted-fms">${isEntry ? "Still inside" : isGeoSpeed ? "Still over the limit" : "Still outside"}</span>`
+            : escapeHtml(trackTime(row.signal_cleared_at))),
+        isGeoSpeed ? detailRow("Speed limit", `${escapeHtml(String(row.speed_limit))} km/h`) : "",
+      ]
+      : isPower
+      ? [
+        detailRow(isLow ? "Low voltage from" : "Disconnected", escapeHtml(trackTime(row.occurred_at))),
+        detailRow(isLow ? "Recovered" : "Restored", row.signal_active ? ongoing : escapeHtml(trackTime(row.signal_cleared_at))),
+        detailRow("Duration", `${escapeHtml(row.duration_text || "—")}${row.signal_active ? " so far" : ""}`),
+      ]
+      : isOverspeed
+      ? [
+        detailRow("Started", escapeHtml(trackTime(row.occurred_at))),
+        detailRow("Ended", row.signal_active ? ongoing : escapeHtml(trackTime(row.signal_cleared_at))),
+        detailRow("Duration", `${escapeHtml(row.duration_text || "—")}${row.signal_active ? " so far" : ""}`),
+      ]
+      : isIdle
       ? [
         detailRow("Idle start", escapeHtml(trackTime(row.occurred_at))),
         detailRow("Alert generated", escapeHtml(trackTime(row.triggered_at))),
@@ -302,8 +351,8 @@
           : `Cleared ${escapeHtml(trackTime(row.signal_cleared_at))}${row.duration_seconds !== null ? ` (after ${escapeHtml(signalDuration(row.duration_seconds))})` : ""}`),
       ];
     document.getElementById("alrDetailList").innerHTML = [
-      detailRow("Alert type", escapeHtml(row.type_label)),
-      detailRow("Severity", `<span class="status-pill ${SEVERITY_TONES[row.severity] || "tone-neutral"}"><span class="dot"></span>${escapeHtml(row.severity_label)}</span>`),
+      detailRow("Alert", escapeHtml(row.type_label)),
+      detailRow("Level", levelPill(row)),
       detailRow("Status", statusPill(row)),
       detailRow("Vehicle", `<strong>${escapeHtml(row.registration_number)}</strong>`),
       detailRow("Driver", row.driver ? escapeHtml(row.driver) : DASH),
@@ -312,8 +361,8 @@
       detailRow("Location", row.location ? escapeHtml(row.location) : DASH),
       detailRow("Latitude", row.latitude === null ? DASH : num(row.latitude, 6)),
       detailRow("Longitude", row.longitude === null ? DASH : num(row.longitude, 6)),
-      detailRow("Speed", row.speed === null ? DASH : `${num(row.speed, 1)} km/h`),
-      isIdle ? "" : detailRow("Voltage", row.voltage === null ? DASH : `${num(row.voltage, 2)} V`),
+      detailRow(isOverspeed || isGeoSpeed ? "Top speed" : "Speed", row.speed === null ? DASH : `${num(row.speed, 1)} km/h`),
+      isIdle || isOverspeed || isGeofence ? "" : detailRow(isBattery ? "Device battery" : isPower ? "Main power" : "Voltage", row.voltage === null ? DASH : `${num(row.voltage, 2)} V`),
       detailRow("Ignition", ignitionText(row.ignition)),
       detailRow("Odometer", row.odometer === null ? DASH : `${num(row.odometer, 1)} km`),
     ].join("");
@@ -342,7 +391,13 @@
       return;
     }
     mapEl.classList.remove("d-none");
-    note.textContent = row.type === "IDLE" ? "Where the vehicle stood idling." : "Position of the reading that raised the alert.";
+    note.textContent = row.type === "IDLE" ? "Where the vehicle stood idling."
+      : row.type === "OVER_SPEEDING" ? "Where the vehicle went over the speed limit."
+      : row.type === "MAIN_POWER_DISCONNECTED" ? "Where the main power was disconnected."
+      : row.type === "LOW_VOLTAGE" ? "Where the main power voltage dropped low."
+      : isBatteryType(row.type) ? "Where the device battery alert was raised."
+      : row.geofence ? `Where the vehicle was when the ${row.type_label.toLowerCase()} alert was raised (${row.geofence.name}).`
+      : "Position of the reading that raised the alert.";
     state.map = L.map(mapEl, { zoomControl: true }).setView([row.latitude, row.longitude], 16);
     FmsMap.addTileLayer(state.map);
     const color = getComputedStyle(document.documentElement)
@@ -408,8 +463,12 @@
     state.filters.vehicle = event.target.value;
     reloadFromFirstPage();
   });
-  document.getElementById("alrSeverityFilter").addEventListener("change", (event) => {
-    state.filters.severity = event.target.value;
+  document.getElementById("alrLevelFilter").addEventListener("change", (event) => {
+    state.filters.level = event.target.value;
+    reloadFromFirstPage();
+  });
+  document.getElementById("alrGeofenceFilter")?.addEventListener("change", (event) => {
+    state.filters.geofence = event.target.value;
     reloadFromFirstPage();
   });
   document.getElementById("alrTypeFilter").addEventListener("change", (event) => {
@@ -424,7 +483,7 @@
   document.getElementById("alrRefreshRetryBtn").addEventListener("click", refreshNow);
   window.addEventListener("fms:alert", () => refreshNow());
 
-  // Downloads = the applied range + vehicle / alert type / status — every matching alert.
+  // Downloads = the applied range + vehicle / alert / level / status — every matching alert.
   FmsReportKit.wireDownloadMenu({
     prefix: "alr",
     exportUrl: EXPORT_URL,

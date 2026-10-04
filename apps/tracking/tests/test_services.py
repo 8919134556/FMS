@@ -230,9 +230,12 @@ class TestTelemetryIngestionService:
 
         vehicle = VehicleFactory()
         device = self._generic_device(vehicle=vehicle)
-        GeofenceFactory(center_latitude="12.971600", center_longitude="77.594600", radius_meters=500)
-        payload = {"timestamp": "2026-08-21T10:30:00Z", "latitude": 12.9716, "longitude": 77.5946, "speed": 0}
-        services.TelemetryIngestionService.ingest(device=device, raw_payload=payload)
+        geofence = GeofenceFactory(center_latitude="12.971600", center_longitude="77.594600", radius_meters=500)
+        geofence.vehicles.add(vehicle)  # only ASSIGNED vehicles are monitored
+        # A crossing is confirmed by consecutive readings (GEOFENCE_CONFIRM_READINGS, default 2).
+        for second in ("00", "30"):
+            payload = {"timestamp": f"2026-08-21T10:30:{second}Z", "latitude": 12.9716, "longitude": 77.5946, "speed": 0}
+            services.TelemetryIngestionService.ingest(device=device, raw_payload=payload)
         assert GeofenceEvent.objects.filter(vehicle=vehicle, event_type=GeofenceEvent.EventType.ENTER).exists()
 
     def test_ingest_still_succeeds_if_geofence_evaluation_raises(self, monkeypatch):
@@ -242,8 +245,11 @@ class TestTelemetryIngestionService:
         def _boom(*args, **kwargs):
             raise RuntimeError("boom")
 
-        monkeypatch.setattr("apps.geofences.services.evaluate_position", _boom)
+        monkeypatch.setattr("apps.geofences.services.process_vehicle_geofences", _boom)
+        from apps.geofences.tests.factories import GeofenceFactory
+
         vehicle = VehicleFactory()
+        GeofenceFactory().vehicles.add(vehicle)
         device = self._generic_device(vehicle=vehicle)
         payload = {"timestamp": "2026-08-21T10:30:00Z", "latitude": 12.9716, "longitude": 77.5946, "speed": 0}
         result = services.TelemetryIngestionService.ingest(device=device, raw_payload=payload)

@@ -76,6 +76,22 @@ class NotificationFeedView(LoginRequiredMixin, TemplateView):
         })
 
 
+class NotificationPulseView(LoginRequiredMixin, TemplateView):
+    """The bell's fast check (every ~2 s): one indexed lookup — the user's
+    newest unread ALERT notification and the unread count — so a new alert
+    reaches the popup + sound within seconds, without re-sending the whole
+    feed on every tick. The bell loads the full feed only when this changes."""
+
+    def get(self, request, *args, **kwargs):
+        latest = (
+            Notification.objects.filter(recipient=request.user, is_read=False, is_archived=False,
+                                        alert__isnull=False)
+            .order_by("-created_at").values_list("uuid", flat=True).first()
+        )
+        return JsonResponse({"latest_alert": str(latest) if latest else None,
+                             "unread_count": services.unread_count(request.user)})
+
+
 @require_POST
 @login_required
 def mark_read(request, uuid):

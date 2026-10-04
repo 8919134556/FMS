@@ -48,6 +48,7 @@
 
     <div class="dropdown" id="fmsNotificationBell"
          data-feed-url="{% url 'notifications:notification_feed' %}"
+         data-pulse-url="{% url 'notifications:notification_pulse' %}"
          data-list-url="{% url 'notifications:notification_list' %}"
          data-mark-read-url-template="{% url 'notifications:notification_mark_read' uuid='00000000-0000-0000-0000-000000000000' %}"
          data-mark-all-read-url="{% url 'notifications:notification_mark_all_read' %}"

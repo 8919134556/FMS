@@ -24,8 +24,14 @@ class Alert(UUIDModel, TimeStampedModel):
     duplicate open alert every time.
 
     Vehicle (telemetry) alerts — ``TELEMETRY_CATEGORIES``: PANIC (CRITICAL) and
-    IDLE (MEDIUM) — are EVENTS raised from the GPS history, one row per
-    episode: apps.alerts.events (panic: 0 -> 1 starts it, further 1s belong to
+    IDLE (MEDIUM), OVER_SPEEDING (HIGH, apps.alerts.overspeed: the device's
+    eventioval 255 start/end records), MAIN_POWER_DISCONNECTED (HIGH, main
+    power < 5 V), LOW_VOLTAGE (MEDIUM, 5 V to < 8.5 V) and the device battery's
+    DEVICE_BATTERY_DISCONNECTED (HIGH, < 2 V) / DEVICE_BATTERY_LOW_VOLTAGE
+    (MEDIUM, 2 V to < 3 V) — the voltage alerts on the same engine as panic —
+    and GEOFENCE_ENTRY / GEOFENCE_EXIT (MEDIUM) and GEOFENCE_SPEEDING (HIGH)
+    from apps.geofences.services, whose geofence is the ``content_object`` — are EVENTS raised from the GPS
+    history, one row per episode: apps.alerts.events (panic: 0 -> 1 starts it, further 1s belong to
     it, 1 -> 0 clears it) and apps.alerts.idle (ignition ON and stationary for
     the vehicle's idle threshold; ends when it moves or the ignition goes off). They carry the vehicle, the client who owned it at the
     time (the tenant boundary for scoping, like TelemetryEvent.client), the
@@ -52,6 +58,15 @@ class Alert(UUIDModel, TimeStampedModel):
         # here + its detector there; the report/exports/bell need no change.
         PANIC = "PANIC", "Panic"
         IDLE = "IDLE", "Idle"
+        OVER_SPEEDING = "OVER_SPEEDING", "Over Speeding"
+        MAIN_POWER_DISCONNECTED = "MAIN_POWER_DISCONNECTED", "Main Power Disconnected"
+        LOW_VOLTAGE = "LOW_VOLTAGE", "Low Voltage"
+        DEVICE_BATTERY_DISCONNECTED = "DEVICE_BATTERY_DISCONNECTED", "Device Battery Disconnected"
+        DEVICE_BATTERY_LOW_VOLTAGE = "DEVICE_BATTERY_LOW_VOLTAGE", "Device Battery Low Voltage"
+        # Geofence events (apps.geofences.services); the geofence is the alert's content_object.
+        GEOFENCE_ENTRY = "GEOFENCE_ENTRY", "Geofence Entry"
+        GEOFENCE_EXIT = "GEOFENCE_EXIT", "Geofence Exit"
+        GEOFENCE_SPEEDING = "GEOFENCE_SPEEDING", "Geofence Speeding"
 
     class Status(models.TextChoices):
         OPEN = "OPEN", "Open"
@@ -116,8 +131,15 @@ class Alert(UUIDModel, TimeStampedModel):
     ignition = models.BooleanField(null=True, blank=True)
     odometer = models.DecimalField(max_digits=10, decimal_places=1, null=True, blank=True)
     voltage = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    speed_limit = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Geofence Speeding: the geofence's speed limit (km/h) when it was raised.",
+    )
 
-    TELEMETRY_CATEGORIES = (Category.PANIC, Category.IDLE)
+    TELEMETRY_CATEGORIES = (
+        Category.PANIC, Category.IDLE, Category.OVER_SPEEDING, Category.MAIN_POWER_DISCONNECTED, Category.LOW_VOLTAGE,
+        Category.DEVICE_BATTERY_DISCONNECTED, Category.DEVICE_BATTERY_LOW_VOLTAGE,
+        Category.GEOFENCE_ENTRY, Category.GEOFENCE_EXIT, Category.GEOFENCE_SPEEDING,
+    )
 
     class Meta:
         ordering = ["-created_at"]

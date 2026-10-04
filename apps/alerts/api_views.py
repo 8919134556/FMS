@@ -23,15 +23,16 @@ logger = logging.getLogger(__name__)
 def _selection(request):
     return ar.resolve_selection(
         user=request.user, vehicle=request.GET.get("vehicle", ""), alert_type=request.GET.get("alert_type", ""),
-        status=request.GET.get("status", ""), severity=request.GET.get("severity", ""),
+        status=request.GET.get("status", ""), level=request.GET.get("level", ""),
+        geofence=request.GET.get("geofence", ""),
         range_key=request.GET.get("range", "today"),
         from_str=request.GET.get("from", ""), to_str=request.GET.get("to", ""),
     )
 
 
 class AlertReportDataView(APIView):
-    """GET /api/v1/alerts/report/?range=…[&from&to]&vehicle=<uuid|all>&alert_type=&severity=&status=
-    &page=&page_size=&sort=time|vehicle|type|status|speed|voltage&dir=asc|desc"""
+    """GET /api/v1/alerts/report/?range=…[&from&to]&vehicle=<uuid|all>&alert_type=&level=&geofence=<uuid>&status=
+    &page=&page_size=&sort=time|vehicle|type|level|status|speed|voltage&dir=asc|desc"""
 
     permission_classes = [IsAuthenticated, HasModulePermission]
     permission_module = "alert"
@@ -52,7 +53,8 @@ class AlertReportDataView(APIView):
             "selection": {
                 "vehicle": str(selection.vehicle.uuid) if selection.vehicle else "all",
                 "vehicle_label": selection.vehicle_label,
-                "type": selection.alert_type, "severity": selection.severity, "status": selection.status,
+                "type": selection.alert_type, "level": selection.level, "status": selection.status,
+                "geofence": str(selection.geofence.uuid) if selection.geofence else "",
                 "range": {"key": selection.range_key, "start": selection.start_date.isoformat(),
                           "end": selection.end_date.isoformat()},
             },
@@ -74,7 +76,8 @@ class AlertDetailView(APIView):
 
     def get(self, request, uuid):
         alert = ar.scoped_alerts(request.user).select_related(
-            "vehicle", "driver", "client", "acknowledged_by", "resolved_by").filter(uuid=uuid).first()
+            "vehicle", "driver", "client", "acknowledged_by", "resolved_by").prefetch_related(
+            "content_object").filter(uuid=uuid).first()
         if alert is None:
             return _report_error("This alert was not found or you don't have access to it.", 404)
         return Response({"alert": ar.serialize(alert),
@@ -111,7 +114,7 @@ class AlertReportExportView(APIView):
             action=AuditLog.Action.EXPORT, module="alert", entity="AlertReport",
             entity_id=f"{selection.start_date}..{selection.end_date}",
             new_value={"type": file_type, "alerts": count, "vehicle": selection.vehicle_label,
-                       "alert_type": selection.alert_type or "all", "severity": selection.severity or "all",
+                       "alert_type": selection.alert_type or "all", "level": selection.level or "all",
                        "status": selection.status or "all"},
             user=request.user, request=request,
         )

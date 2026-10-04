@@ -236,7 +236,7 @@ class TestNotifications:
 class TestRobustness:
     def test_an_alerting_failure_never_loses_the_telemetry(self, watcher):
         v = _vehicle()
-        with mock.patch.object(events, "_on_panic", side_effect=RuntimeError("boom")):
+        with mock.patch.object(events, "_on_level", side_effect=RuntimeError("boom")):
             result = _ingest(v, _reading(_base(), 1))
         assert result.accepted == 1
         assert TelemetryEvent.objects.filter(vehicle=v).count() == 1

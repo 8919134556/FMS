@@ -551,3 +551,40 @@
   .live-vehicle-dialog { margin: var(--fms-space-2); }
   .live-vehicle-map { height: 40vh; }
 }
+
+/* Main Power column (Vehicle Status table + Live Map popup) */
+.main-power { font-variant-numeric: tabular-nums; }
+.main-power.is-on { color: var(--fms-text-primary); }
+.main-power.is-on .bi { color: var(--fms-success); }
+.main-power.is-off { color: var(--fms-danger); font-weight: 600; }
+.main-power.is-low { color: var(--fms-warning); font-weight: 600; }
+/* Vehicle Status table: room for the Main Power column on smaller desktops. */
+@media (min-width: 992px) and (max-width: 1599.98px) {
+  #vehicleStatusTable .cell-location { max-width: 220px; min-width: 140px; }
+  #vehicleStatusTable > :not(caption) > * > * { padding-left: 10px; padding-right: 10px; }
+}
+
+/* ---------------- Geofence layer: toggle, legend, hover details ---------------- */
+.live-geofence-toggle .live-geofence-state {
+  margin-left: 6px; padding: 0 6px; border-radius: var(--fms-radius-full, 999px);
+  font-size: 0.68rem; font-weight: 700; background: var(--fms-neutral-soft); color: var(--fms-text-muted);
+}
+.live-geofence-toggle.is-on .live-geofence-state { background: var(--fms-success-soft); color: var(--fms-success); }
+.live-geofence-toggle.is-on .bi { color: var(--fms-success); }
+.live-geofence-legend {
+  position: absolute; right: 12px; bottom: 24px; z-index: 500;
+  background: var(--fms-card); border: 1px solid var(--fms-border); border-radius: var(--fms-radius-md, 8px);
+  box-shadow: var(--fms-shadow-sm); padding: 8px 10px; font-size: var(--fms-text-tiny, 0.75rem); line-height: 1.7;
+  min-width: 140px;
+}
+.live-geofence-legend.d-none { display: none; }
+.live-geofence-legend-title { font-weight: 700; color: var(--fms-text-primary); margin-bottom: 2px; }
+.live-geofence-legend .swatch {
+  display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 3px;
+  border: 2px solid var(--swatch); background: color-mix(in srgb, var(--swatch) 20%, transparent);
+}
+.live-geofence-legend .count { float: right; margin-left: 10px; color: var(--fms-text-muted); font-variant-numeric: tabular-nums; }
+.geofence-tooltip, .geofence-popup .leaflet-popup-content { font-size: var(--fms-text-small, 0.85rem); line-height: 1.5; }
+.geofence-tip-title { font-weight: 700; margin-bottom: 2px; }
+.geofence-popup .leaflet-popup-content { margin: 10px 14px; }
+@media (max-width: 575.98px) { .live-geofence-legend { bottom: 12px; right: 8px; } }

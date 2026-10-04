@@ -176,7 +176,7 @@ The reverse-geocoded address from comms' `current_table.location` is stored on t
 and shown in the Live Tracking **Vehicle Status** table and detail panel; selecting a vehicle (table row or
 marker) flies the map to its exact position at street-level zoom.
 
-### Panic / Idle alerts and the Alert Report
+### Panic / Idle / Over Speeding / Main Power alerts and the Alert Report
 
 * **Source of truth.** The comms stored procedure `insert_current_and_history_json` sets
   `panic = 1` when the device's analog input `analog1 / 1000 >= 10 V` (else 0) in APPDB `history_table` /
@@ -204,6 +204,44 @@ marker) flies the map to its exact position at street-level zoom.
   `IDLE_ALERT_MIN_READINGS` (3). One alert per idle episode; it ends when the vehicle moves or the ignition goes
   off, and its duration is the real idle time. Independent from trips. Backfill:
   `python manage.py backfill_idle_alerts --days 7` (no notifications).
+* **Over Speeding alerts** (`apps/alerts/overspeed.py`, HIGH): comms stores the device's triggering event id in
+  `eventioval`; the website maps `eventioval == 255` -> `overspeed = 1` (`overspeed_from_eventioval`, the only place
+  the mapping lives; the bridge stores just `metadata["overspeed"]`, never `eventioval`). The device sends a 255
+  record when the vehicle goes over the limit and another when it drops back under, so a 255 opens an alert and
+  the next 255 (within `OVERSPEED_MAX_EPISODE_MINUTES`, default 30, no ignition OFF between) closes it; the alert's
+  speed is the episode's top speed. Out-of-order and re-delivered records are handled. Backfill from the comms
+  Raw DB: `python manage.py backfill_overspeed_alerts --days 7` (no notifications).
+* **Main power voltage alerts** (same level engine as Panic): comms stores `mainpower` = externalvoltage / 1000 (V).
+  `main_power_state` in `apps/alerts/events.py` (the only place the ranges live) classifies each reading exactly:
+  `0 <= V < 5` **Main Power Disconnected** (HIGH), `5 <= V < 8.5` **Low Voltage** (MEDIUM), `V >= 8.5` normal;
+  NULL / negative = no information. Each reading carries `power_cut` / `low_voltage` flags; a change INTO an alert
+  state opens one alert (+ notification and sound), further readings in the same state change nothing, and a
+  change out of it (another range or >= 8.5 V) clears it — per vehicle. The voltage and its state are also on the
+  vehicle's current position (Live Tracking -> Vehicle Status -> Main Power). `backfill_panic_alerts` also
+  backfills main power.
+* **Device battery alerts** (same engine, its own flags): comms stores `device_battery_voltage` = batteryvoltage /
+  1000 (V). `device_battery_state` (same exact-band classifier as main power, `DEVICE_BATTERY_BANDS`) gives
+  `0 <= V < 2` **Device Battery Disconnected** (HIGH), `2 <= V < 3` **Device Battery Low Voltage** (MEDIUM),
+  `V >= 3` normal. The voltage is an alert input only: kept in the history record's metadata, never on the
+  current position, the Live Tracking feed/page, or a visible history column; battery alert messages carry no
+  voltage (the report and exports show it on the alert itself).
+* **Geofence alerts** (`apps/geofences/services.py`, run in the same ingestion hook for every reading): a geofence
+  is a circle or a polygon drawn on the form's map, of type **Entry** (Geofence Entry, MEDIUM, when an assigned
+  vehicle enters), **Exit** (Geofence Exit, MEDIUM, when it leaves), **Entry and Exit** (both, from one geofence)
+  or **Speed Limit** (Geofence Speeding, HIGH,
+  while inside and speed > the geofence's km/h limit; cleared when back under the limit or on leaving; the
+  alert keeps the limit and the episode's top speed). Only ACTIVE geofences and their ASSIGNED vehicles are
+  evaluated. State per vehicle + geofence = the latest `GeofenceEvent` (ENTER/EXIT); a crossing needs
+  `GEOFENCE_CONFIRM_READINGS` (2) consecutive trustworthy fixes, and leaving needs to be more than
+  `GEOFENCE_EXIT_TOLERANCE_METERS` (20) outside the boundary, so GPS jitter and single jumps never flap. Alerts
+  link their geofence (Alert Report filter, PDF/Excel "Geofence" and "Speed limit" columns).
+  Live Tracking draws every active geofence the viewer may see (client users: only those assigned to their
+  vehicles), coloured by type (Entry green, Exit orange, Speed Limit red, Entry and Exit purple), with hover / click
+  details, a legend, and a Geofences ON/OFF button that only hides them visually.
+* **Fast notifications (no WebSockets in this deployment):** the bell asks `/notifications/pulse/` every 2 s (10 s
+  in a background tab) — one indexed lookup of the newest unread alert notification — and loads the full feed,
+  popup and sound only when it changes. With the comms bridge at `COMMS_SYNC_INTERVAL_SECONDS=2` (a pass takes
+  ~0.1 s), a device record reaches the popup within a few seconds of comms storing it.
 * **Backfill** history imported before this existed: `python manage.py backfill_panic_alerts --days 7`
   (idempotent, sends no notifications). New types (overspeed, geofence, ...) = a new `Alert.Category` plus a
   detector in `apps/alerts/events.py`; the report, bell and exports need no change.

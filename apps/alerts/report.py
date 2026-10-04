@@ -31,12 +31,13 @@ EXCEL_MAX_ROWS = 1_000_000
 TYPE_CHOICES = [(c.value, c.label) for c in Alert.TELEMETRY_CATEGORIES]
 STATUS_CHOICES = list(Alert.Status.choices)
 STATUS_LABELS = {Alert.Status.OPEN: "New", Alert.Status.ACKNOWLEDGED: "Acknowledged", Alert.Status.RESOLVED: "Resolved"}
-SEVERITY_CHOICES = list(Alert.Severity.choices)
+# "Level" in the UI/exports = Alert.severity (one field; the label is just the report's wording).
+LEVEL_CHOICES = list(Alert.Severity.choices)
 
 # Whitelisted server-side sorts; ties fall back to time.
 SORTS = {
     "time": "occurred_at", "vehicle": "vehicle__registration_number", "type": "category",
-    "status": "status", "speed": "speed", "voltage": "voltage", "severity": "severity",
+    "status": "status", "speed": "speed", "voltage": "voltage", "level": "severity",
 }
 
 
@@ -46,7 +47,8 @@ class Selection:
     vehicle: object  # Vehicle or None (= all vehicles the user can see)
     alert_type: str
     status: str
-    severity: str
+    level: str  # Alert.severity value, or "" for all
+    geofence: object  # Geofence or None (= any)
     range_key: str
     start_date: datetime.date
     end_date: datetime.date
@@ -63,8 +65,8 @@ class Selection:
         return dict(TYPE_CHOICES).get(self.alert_type, "All alerts")
 
     @property
-    def severity_label(self):
-        return dict(SEVERITY_CHOICES).get(self.severity, "All severities")
+    def level_label(self):
+        return dict(LEVEL_CHOICES).get(self.level, "All levels")
 
     @property
     def status_label(self):
@@ -81,8 +83,8 @@ def report_vehicles(user):
     )
 
 
-def resolve_selection(*, user, vehicle="", alert_type="", status="", severity="", range_key="today", from_str="",
-                      to_str="", now=None):
+def resolve_selection(*, user, vehicle="", alert_type="", status="", level="", geofence="", range_key="today",
+                      from_str="", to_str="", now=None):
     """Strict, like the other report downloads: bad input is a readable error,
     never a silently different selection."""
     now = now or timezone.now()
@@ -100,13 +102,19 @@ def resolve_selection(*, user, vehicle="", alert_type="", status="", severity=""
     status = (status or "").strip().upper()
     if status and status not in Alert.Status.values:
         raise ReportError("Unknown alert status.")
-    severity = (severity or "").strip().upper()
-    if severity and severity not in Alert.Severity.values:
-        raise ReportError("Unknown alert severity.")
+    level = (level or "").strip().upper()
+    if level and level not in Alert.Severity.values:
+        raise ReportError("Unknown alert level.")
+    geofence = (geofence or "").strip()
+    geofence_obj = None
+    if geofence and geofence.lower() != "all":
+        geofence_obj = report_geofences(user).filter(uuid=geofence).first() if _is_uuid(geofence) else None
+        if geofence_obj is None:
+            raise ReportError("The selected geofence was not found or you don't have access to it.", status=404)
     period_start = datetime.datetime.combine(start_date, datetime.time.min, tzinfo=tz)
     period_end = datetime.datetime.combine(end_date + datetime.timedelta(days=1), datetime.time.min, tzinfo=tz)
-    return Selection(user, vehicle_obj, alert_type, status, severity, range_key, start_date, end_date, period_start,
-                     period_end, tz)
+    return Selection(user, vehicle_obj, alert_type, status, level, geofence_obj, range_key, start_date, end_date,
+                     period_start, period_end, tz)
 
 
 def _is_uuid(value):
@@ -117,6 +125,30 @@ def _is_uuid(value):
     except ValueError:
         return False
     return True
+
+
+def _geofence_ct():
+    from django.contrib.contenttypes.models import ContentType
+
+    from apps.geofences.models import Geofence
+
+    return ContentType.objects.get_for_model(Geofence)
+
+
+def report_geofences(user):
+    """The Geofence filter's options: geofences that have alerts the user can
+    see — never another client's zone names."""
+    from apps.geofences.models import Geofence
+
+    ids = scoped_alerts(user).filter(content_type=_geofence_ct()).values("object_id").distinct()
+    return Geofence.objects.filter(pk__in=ids).order_by("name")
+
+
+def alert_geofence(alert):
+    from apps.geofences.models import Geofence
+
+    obj = alert.content_object if alert.content_type_id else None
+    return obj if isinstance(obj, Geofence) else None
 
 
 def scoped_alerts(user):
@@ -134,11 +166,15 @@ def alerts_queryset(selection, *, with_status=True):
         qs = qs.filter(vehicle=selection.vehicle)
     if selection.alert_type:
         qs = qs.filter(category=selection.alert_type)
-    if selection.severity:
-        qs = qs.filter(severity=selection.severity)
+    if selection.level:
+        qs = qs.filter(severity=selection.level)
+    if selection.geofence is not None:
+        qs = qs.filter(content_type=_geofence_ct(), object_id=selection.geofence.pk)
     if with_status and selection.status:
         qs = qs.filter(status=selection.status)
-    return qs.select_related("vehicle", "driver", "client", "acknowledged_by", "resolved_by")
+    # content_object = the geofence of geofence alerts (one extra query per page, never per row).
+    return qs.select_related("vehicle", "driver", "client", "acknowledged_by", "resolved_by").prefetch_related(
+        "content_object")
 
 
 def summary(selection):
@@ -156,10 +192,10 @@ def summary(selection):
         alerts_queryset(selection, with_status=False).order_by().values_list("category").annotate(n=Count("id"))
     )
     totals["by_type"] = {key: by_type.get(key, 0) for key, _label in TYPE_CHOICES}
-    by_severity = dict(
+    by_level = dict(
         alerts_queryset(selection, with_status=False).order_by().values_list("severity").annotate(n=Count("id"))
     )
-    totals["by_severity"] = {key: by_severity.get(key, 0) for key, _label in SEVERITY_CHOICES}
+    totals["by_level"] = {key: by_level.get(key, 0) for key, _label in LEVEL_CHOICES}
     totals["matching"] = totals["total"] if not selection.status else {
         Alert.Status.OPEN: totals["open"], Alert.Status.ACKNOWLEDGED: totals["acknowledged"],
         Alert.Status.RESOLVED: totals["resolved"],
@@ -227,8 +263,8 @@ def serialize(alert):
         "uuid": str(alert.uuid),
         "type": alert.category,
         "type_label": alert.get_category_display(),
-        "severity": alert.severity,
-        "severity_label": alert.get_severity_display(),
+        "level": alert.severity,
+        "level_label": alert.get_severity_display(),
         "status": alert.status,
         "status_label": STATUS_LABELS.get(alert.status, alert.get_status_display()),
         "occurred_at": _iso(alert.occurred_at),
@@ -249,6 +285,8 @@ def serialize(alert):
         "speed": _num(alert.speed),
         "ignition": alert.ignition,
         "voltage": _num(alert.voltage),
+        "speed_limit": alert.speed_limit,
+        "geofence": ({"uuid": str(g.uuid), "name": g.name} if (g := alert_geofence(alert)) else None),
         "odometer": _num(alert.odometer),
         "created_at": _iso(alert.created_at),
         "acknowledged_by": alert.acknowledged_by.get_full_name() if alert.acknowledged_by_id else "",

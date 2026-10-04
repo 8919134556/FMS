@@ -482,3 +482,10 @@
 }
 .alert-report-table .trip-location { max-width: 150px; }
 .table.alert-report-table > :not(caption) > * > * { padding-left: 10px; padding-right: 10px; }
+.alert-level-pill { white-space: nowrap; }
+.alert-report-table .status-pill { white-space: nowrap; }
+/* Smaller desktops: keep all Alert Report columns visible. */
+@media (max-width: 1365.98px) {
+  .alert-report-table .trip-location { max-width: 90px; }
+  .table.alert-report-table > :not(caption) > * > * { padding-left: 8px; padding-right: 8px; }
+}

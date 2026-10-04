@@ -46,6 +46,7 @@ def unread_alert_announcements(user):
             "type": alert.category,
             "type_label": alert.get_category_display(),
             "severity": alert.severity,
+            "level_label": alert.get_severity_display(),
             "message": alert.message if alert.category != "PANIC" else "",
             "vehicle": alert.vehicle.registration_number if alert.vehicle_id else "",
             "driver": alert.driver.get_full_name() if alert.driver_id else "",

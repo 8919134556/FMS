@@ -95,12 +95,25 @@
       </div>
 
       <div class="map-controls-top-right">
+        <button type="button" class="btn btn-sm btn-light live-geofence-toggle is-on" id="liveGeofenceToggle"
+                aria-pressed="true" title="Hide geofences">
+          <i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Geofences</span>
+          <span class="live-geofence-state" data-geofence-state>ON</span>
+        </button>
         <button type="button" class="btn btn-sm btn-light" id="liveFollowToggle" title="Follow selected vehicle">
           <i class="bi bi-crosshair"></i><span class="d-none d-md-inline ms-1">Follow</span>
         </button>
         <button type="button" class="btn btn-sm btn-light" id="liveFitFleetBtn" title="Fit map to fleet">
           <i class="bi bi-aspect-ratio"></i><span class="d-none d-md-inline ms-1">Fit Fleet</span>
         </button>
+      </div>
+
+      <div class="live-geofence-legend d-none" id="liveGeofenceLegend" aria-label="Geofence legend">
+        <div class="live-geofence-legend-title">Geofences</div>
+        <div><span class="swatch" style="--swatch: var(--fms-success);"></span>Entry <span class="count" data-geofence-count="ENTRY">0</span></div>
+        <div><span class="swatch" style="--swatch: var(--fms-warning);"></span>Exit <span class="count" data-geofence-count="EXIT">0</span></div>
+        <div><span class="swatch" style="--swatch: var(--fms-danger);"></span>Speed Limit <span class="count" data-geofence-count="SPEED_LIMIT">0</span></div>
+        <div><span class="swatch" style="--swatch: var(--fms-purple);"></span>Entry and Exit <span class="count" data-geofence-count="ENTRY_AND_EXIT">0</span></div>
       </div>
 
       <div class="map-refresh-error d-none" id="fleetRefreshError">
@@ -145,6 +158,7 @@
               <th>Track Time</th>
               <th>Speed</th>
               <th>Odometer</th>
+              <th>Main Power</th>
               <th>Location</th>
               <th>Status</th>
               <th>Action</th>

@@ -49,6 +49,8 @@ class FleetCurrentTelemetrySerializer(serializers.Serializer):
     odometer = serializers.DecimalField(max_digits=10, decimal_places=1, allow_null=True)
     location = serializers.CharField(allow_blank=True)
     gps_odometer = serializers.DecimalField(max_digits=12, decimal_places=3, allow_null=True)
+    main_power = serializers.DecimalField(max_digits=6, decimal_places=3, allow_null=True, required=False)
+    main_power_state = serializers.CharField(allow_null=True, required=False)  # DISCONNECTED / LOW / NORMAL
     timestamp = serializers.DateTimeField()
     connection_status = serializers.CharField()
     movement_state = serializers.CharField(allow_null=True)

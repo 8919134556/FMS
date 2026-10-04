@@ -183,6 +183,7 @@
       <div class="fms-alert-popup-body">
         ${alert.message ? `<p class="fms-alert-popup-message">${escapeHtml(alert.message)}</p>` : ""}
         ${row("Vehicle", alert.vehicle)}
+        ${row("Level", alert.level_label)}
         ${row("Driver", alert.driver)}
         ${row("Time", formatTime(alert.occurred_at))}
         ${row("Location", location)}

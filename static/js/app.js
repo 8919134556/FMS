@@ -216,23 +216,49 @@
         .catch(() => {});
     });
 
-    // Polled (no WebSockets in this deployment): every 15 s while the tab is
-    // visible so a panic alert surfaces within seconds; every 60 s in the
-    // background so an unattended dispatcher tab still raises the alarm.
-    const VISIBLE_POLL_MS = 15000;
-    const HIDDEN_POLL_MS = 60000;
-    let lastPoll = 0;
-    function poll() {
-      lastPoll = Date.now();
+    // Real time without WebSockets (this deployment has none): a tiny "pulse"
+    // request every 2 s while the tab is visible (10 s in a background tab —
+    // browsers throttle hidden timers anyway) returns only the newest unread
+    // alert notification + unread count. The full feed — and with it the alert
+    // popup and sound — is fetched the moment either changes, plus a full
+    // refresh every 60 s for read/archived changes made elsewhere.
+    const PULSE_URL = bell.dataset.pulseUrl;
+    const VISIBLE_PULSE_MS = 2000;
+    const HIDDEN_PULSE_MS = 10000;
+    const FULL_REFRESH_MS = 60000;
+    let lastPulse = 0;
+    let lastFull = 0;
+    let lastSeen = null; // { latest_alert, unread_count }
+    let pulseBusy = false;
+
+    function fullRefresh() {
+      lastFull = Date.now();
       refresh();
     }
-    poll();
+
+    function pulse() {
+      if (pulseBusy) return;
+      pulseBusy = true;
+      lastPulse = Date.now();
+      fetch(PULSE_URL, { headers: { Accept: "application/json" }, cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : Promise.reject()))
+        .then((data) => {
+          const changed = !lastSeen || data.latest_alert !== lastSeen.latest_alert
+            || data.unread_count !== lastSeen.unread_count;
+          lastSeen = data;
+          if (changed || Date.now() - lastFull >= FULL_REFRESH_MS) fullRefresh();
+        })
+        .catch(() => {})
+        .finally(() => { pulseBusy = false; });
+    }
+
+    fullRefresh();
     window.setInterval(() => {
-      const due = document.hidden ? HIDDEN_POLL_MS : VISIBLE_POLL_MS;
-      if (Date.now() - lastPoll >= due - 500) poll();
-    }, VISIBLE_POLL_MS);
+      const due = document.hidden ? HIDDEN_PULSE_MS : VISIBLE_PULSE_MS;
+      if (Date.now() - lastPulse >= due - 100) pulse();
+    }, VISIBLE_PULSE_MS);
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && Date.now() - lastPoll > VISIBLE_POLL_MS) poll();
+      if (!document.hidden) pulse();
     });
   }
 

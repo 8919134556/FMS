@@ -159,6 +159,7 @@ def upsert_current_telemetry(*, vehicle, device, event):
         "odometer": event.odometer,
         "location": ((event.metadata or {}).get("location") or "")[:255],
         "gps_odometer": _metadata_decimal(event.metadata, "gps_odometer_km"),
+        "main_power": _metadata_decimal(event.metadata, "mainpower"),
     }
     obj, created = VehicleCurrentTelemetry.objects.select_for_update().get_or_create(
         vehicle=vehicle, defaults=defaults
@@ -186,7 +187,7 @@ def upsert_current_telemetry(*, vehicle, device, event):
         # before addresses / GPS odometer were carried over): fill the gaps,
         # change nothing else.
         gaps = [
-            name for name in ("location", "gps_odometer")
+            name for name in ("location", "gps_odometer", "main_power")
             if defaults[name] not in (None, "") and getattr(obj, name) in (None, "")
         ]
         for name in gaps:
@@ -211,30 +212,36 @@ def connection_status_for(current):
     return "OFFLINE"
 
 
-def _evaluate_geofences(*, vehicle, event):
-    """Best-effort geofence breach check on every position update. Isolated
-    behind a try/except deliberately: geofencing is additive functionality,
-    and a bug or bad geofence row must never break telemetry ingestion
-    itself (the one thing this whole app exists to do reliably)."""
-    try:
-        from apps.geofences.services import evaluate_position
-
-        evaluate_position(vehicle, event.latitude, event.longitude, occurred_at=event.timestamp)
-    except Exception:
-        logger.exception("Geofence evaluation failed for vehicle %s", vehicle.pk)
-
-
 def _evaluate_alerts(*, vehicle, device, events):
-    """Vehicle alert events (panic, idle) from the readings just stored —
+    """Vehicle alert events (panic, idle, overspeed, voltage, geofences) from the readings just stored —
     apps.alerts.events is the single detector; it isolates its own failures."""
     from apps.alerts.events import evaluate_ingested
 
     evaluate_ingested(vehicle=vehicle, device=device, readings=events)
 
 
+# Alert flags that mark an EVENT record. A device can send its event record at
+# the same instant and position as an ordinary one (seen: two rows at 12:31:12,
+# eventioval 0 and 255); the history keeps one row per (device, timestamp,
+# lat, lon), so the flag is merged into whichever row was kept.
+_EVENT_FLAGS = ("overspeed",)
+
+
+def _keep_event_flags(device, events):
+    for ev in events:
+        flags = {k: ev.metadata[k] for k in _EVENT_FLAGS if (ev.metadata or {}).get(k) == 1}
+        if not flags:
+            continue
+        for row in TelemetryEvent.objects.filter(device=device, timestamp=ev.timestamp, latitude=ev.latitude,
+                                                 longitude=ev.longitude):
+            if any(row.metadata.get(k) != v for k, v in flags.items()):
+                row.metadata = {**row.metadata, **flags}
+                row.save(update_fields=["metadata"])
+
+
 def _persist_events(*, device, vehicle, client_id, events, parse_errors, raw_event):
-    """Validate -> store history -> advance the live position -> geofences ->
-    alert events.
+    """Validate -> store history -> advance the live position -> alert events
+    (incl. geofences).
     Shared by socket/HTTP ingest (``raw_event`` present) and the comms bridge
     (``raw_event`` None). Must run inside the caller's transaction."""
     valid_events = []
@@ -272,11 +279,12 @@ def _persist_events(*, device, vehicle, client_id, events, parse_errors, raw_eve
             ],
             ignore_conflicts=True,
         )
+        _keep_event_flags(device, valid_events)
 
         if vehicle is not None:
             latest_event = max(valid_events, key=lambda ev: ev.timestamp)
             upsert_current_telemetry(vehicle=vehicle, device=device, event=latest_event)
-            _evaluate_geofences(vehicle=vehicle, event=latest_event)
+            # Telemetry alerts AND geofences (every reading, not just the latest).
             _evaluate_alerts(vehicle=vehicle, device=device, events=valid_events)
 
     if raw_event is not None:
@@ -376,6 +384,12 @@ class TelemetryIngestionService:
 # permission_classes), same split as connection_status_for.
 # ---------------------------------------------------------------------------
 
+def _main_power_state(volts):
+    from apps.alerts.events import main_power_state
+
+    return main_power_state(volts)
+
+
 def movement_state_for(current):
     """MOVING/IDLE from ``current.speed`` vs
     ``settings.TELEMATICS_MOVEMENT_SPEED_THRESHOLD_KMH`` — the one place
@@ -430,6 +444,8 @@ def fleet_current_telemetry(user=None):
                 "odometer": row.odometer,
                 "location": row.location,
                 "gps_odometer": row.gps_odometer,
+                "main_power": row.main_power,
+                "main_power_state": _main_power_state(row.main_power),
                 "timestamp": row.timestamp,
                 "connection_status": connection_status_for(row),
                 "movement_state": movement_state_for(row),

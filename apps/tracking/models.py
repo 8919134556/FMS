@@ -186,6 +186,10 @@ class VehicleCurrentTelemetry(TimeStampedModel):
         max_digits=12, decimal_places=3, null=True, blank=True,
         help_text="GPS trip odometer in km (comms current_table.gpsodometer, reported in metres).",
     )
+    main_power = models.DecimalField(
+        max_digits=6, decimal_places=3, null=True, blank=True,
+        help_text="Main (external) power voltage in V (comms mainpower = externalvoltage / 1000); 0 = disconnected.",
+    )
 
     class Meta:
         verbose_name_plural = "Vehicle current telemetry"

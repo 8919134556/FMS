@@ -6,8 +6,9 @@ from apps.tracking import comms_sync
 
 class Command(BaseCommand):
     help = (
-        "Copies the comms panic flag (and panic voltage) onto GPS history imported before the bridge carried it, "
-        "and rebuilds the Panic alert events for that period — without sending notifications. Idempotent; "
+        "Copies the comms panic flag (and panic voltage) main power and device battery voltage onto GPS history imported before the "
+        "bridge carried them, and rebuilds the Panic, Main Power and Device Battery alerts for that period — without "
+        "sending notifications. Idempotent; "
         "new data needs no backfill (the comms bridge raises alerts as it imports)."
     )
 
@@ -21,5 +22,5 @@ class Command(BaseCommand):
             raise CommandError("--days must be at least 1.")
         result = comms_sync.backfill_panic_flags(days=options["days"])
         self.stdout.write(self.style.SUCCESS(
-            f"Updated {result['updated']} history record(s); created {result['alerts_created']} panic alert event(s)."
+            f"Updated {result['updated']} history record(s); created {result['alerts_created']} panic / main power / device battery alert(s)."
         ))

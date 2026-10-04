@@ -23,7 +23,9 @@
           <thead>
             <tr>
               <th>Geofence</th>
-              <th>Radius</th>
+              <th>Type</th>
+              <th>Area</th>
+              <th>Vehicles</th>
               <th>Linked To</th>
               <th>Status</th>
               <th class="text-end">Actions</th>
@@ -43,7 +45,9 @@
                     </span>
                   </a>
                 </td>
-                <td class="cell-secondary">{{ geofence.radius_meters }} m</td>
+                <td>{{ geofence.type_summary }}</td>
+                <td class="cell-secondary">{% if geofence.shape == "POLYGON" %}Polygon{% else %}{{ geofence.radius_meters }} m radius{% endif %}</td>
+                <td class="cell-secondary">{{ geofence.vehicle_count }}</td>
                 <td class="cell-secondary">
                   {% if geofence.site %}<a href="{% url 'locations:site_detail' uuid=geofence.site.uuid %}">{{ geofence.site.site_name }}</a>
                   {% elif geofence.branch %}<a href="{% url 'locations:branch_detail' uuid=geofence.branch.uuid %}">{{ geofence.branch.name }}</a>
@@ -86,10 +90,10 @@
       </div>
       {% include "components/pagination.html" %}
     {% else %}
-      {% if current_filters.q or current_filters.status %}
+      {% if current_filters.q or current_filters.status or current_filters.type %}
         {% include "components/empty_state.html" with icon="funnel" title="No geofences match your filters" message="Try adjusting or clearing your filters." action_url=request.path action_label="Clear Filters" %}
       {% else %}
-        {% include "components/empty_state.html" with icon="pin-map" title="No geofences yet" message="Add a geofence to monitor when vehicles enter or exit a zone." action_url=create_url action_label="Add Geofence" %}
+        {% include "components/empty_state.html" with icon="pin-map" title="No geofences yet" message="Add an Entry, Exit or Speed Limit geofence and assign the vehicles to monitor." action_url=create_url action_label="Add Geofence" %}
       {% endif %}
     {% endif %}
   </div>

@@ -208,7 +208,7 @@ class TestExports:
         book = load_workbook(io.BytesIO(xlsx.content))
         assert book.sheetnames == ["Summary", "Alerts"]
         header, *rows = list(book["Alerts"].iter_rows(values_only=True))
-        assert header[:9] == ("Alert ID", "Date", "Time", "Vehicle", "Vehicle ID", "Client", "Driver", "Alert type", "Severity")
+        assert header[:9] == ("Alert ID", "Date", "Time", "Vehicle", "Vehicle ID", "Client", "Driver", "Alert", "Level")
         assert [r[3] for r in rows] == ["ALPHA-001", "BRAVO-001"]  # oldest first
         assert {r[0] for r in rows} == {str(world["alert_a"].uuid), str(world["alert_b"].uuid)}
         voltage = header.index("Voltage (V)")

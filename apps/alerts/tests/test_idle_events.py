@@ -325,17 +325,18 @@ class TestReportAndExports:
         _ingest(v, readings + _drive(t + 12 * M + 10 * S, 60))
         return v
 
-    def test_type_and_severity_filters(self, client):
+    def test_alert_and_level_filters(self, client):
         self._data()
         self._staff(client)
         body = client.get(REPORT_API).json()
-        assert body["summary"]["by_type"] == {"PANIC": 1, "IDLE": 1}
-        assert body["summary"]["by_severity"]["MEDIUM"] == 1 and body["summary"]["by_severity"]["CRITICAL"] == 1
+        by_type = body["summary"]["by_type"]
+        assert (by_type["PANIC"], by_type["IDLE"]) == (1, 1) and sum(by_type.values()) == 2
+        assert body["summary"]["by_level"]["MEDIUM"] == 1 and body["summary"]["by_level"]["CRITICAL"] == 1
         idle_rows = client.get(REPORT_API, {"alert_type": "IDLE"}).json()["alerts"]["rows"]
         assert [r["type"] for r in idle_rows] == ["IDLE"]
-        medium = client.get(REPORT_API, {"severity": "MEDIUM"}).json()["alerts"]["rows"]
-        assert [r["severity_label"] for r in medium] == ["Medium"]
-        assert client.get(REPORT_API, {"severity": "EXTREME"}).status_code == 400
+        medium = client.get(REPORT_API, {"level": "MEDIUM"}).json()["alerts"]["rows"]
+        assert [(r["type_label"], r["level_label"]) for r in medium] == [("Idle", "Medium")]  # two separate values
+        assert client.get(REPORT_API, {"level": "EXTREME"}).status_code == 400
         row = idle_rows[0]
         assert row["duration_text"].startswith("12m") and row["triggered_at"] != row["occurred_at"]
         assert row["signal_active"] is False
@@ -347,15 +348,15 @@ class TestReportAndExports:
         self._staff(client)
         response = client.get("/api/v1/alerts/report/export/", {"type": "xlsx", "alert_type": "IDLE"})
         header, *rows = list(load_workbook(io.BytesIO(response.content))["Alerts"].iter_rows(values_only=True))
-        for column in ("Severity", "Start time", "Alert time", "End time", "Duration", "Duration (s)"):
+        for column in ("Alert", "Level", "Start time", "Alert time", "End time", "Duration", "Duration (s)"):
             assert column in header
         [row] = rows
         values = dict(zip(header, row))
-        assert values["Alert type"] == "Idle" and values["Severity"] == "Medium"
+        assert values["Alert"] == "Idle" and values["Level"] == "Medium"
         assert values["Duration (s)"] >= 12 * 60 and values["End time"] is not None
 
     def test_pdf_lists_idle_alerts(self, client):
         self._data()
         self._staff(client)
-        response = client.get("/api/v1/alerts/report/export/", {"type": "pdf", "severity": "MEDIUM"})
+        response = client.get("/api/v1/alerts/report/export/", {"type": "pdf", "level": "MEDIUM"})
         assert response.status_code == 200 and response.content.startswith(b"%PDF")

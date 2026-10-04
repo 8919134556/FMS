@@ -1286,3 +1286,26 @@ a.notification-row-title:hover { color: var(--fms-primary); }
 @keyframes fms-alert-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @keyframes fms-alert-pulse { 50% { box-shadow: 0 0 0 6px rgba(var(--fms-danger-rgb, 220, 38, 38), 0.35), var(--fms-shadow-lg); } }
 @media (prefers-reduced-motion: reduce) { .fms-alert-popup { animation: none; } }
+
+/* ---------------- Geofence form: map editor + vehicle checklist ---------------- */
+.geofence-editor { display: grid; gap: 12px; }
+.geofence-map { height: 420px; border-radius: var(--fms-radius-md, 8px); border: 1px solid var(--fms-border); }
+.geofence-editor-tools .gf-polygon-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.geofence-editor-tools .gf-polygon-fields.d-none { display: none; }
+.gf-vertex { background: #fff; border: 2px solid var(--fms-primary); border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15); }
+.geofence-vehicle-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.geofence-vehicle-tools input[type="search"] { max-width: 260px; }
+.geofence-vehicle-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px;
+  max-height: 260px; overflow-y: auto; padding: 8px; border: 1px solid var(--fms-border); border-radius: var(--fms-radius-md, 8px);
+}
+.geofence-vehicle-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: var(--fms-text-small, .85rem); }
+.geofence-vehicle-item:hover { background: var(--fms-surface-2); }
+.geofence-vehicle-item.d-none { display: none; }
+.geofence-detail-map { height: 300px; border-radius: var(--fms-radius-md, 8px); border: 1px solid var(--fms-border); }
+@media (max-width: 767.98px) { .geofence-map { height: 320px; } }
+.geofence-type-options { display: grid; gap: 6px; }
+.geofence-type-option { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--fms-border);
+  border-radius: var(--fms-radius-md, 8px); cursor: pointer; font-size: var(--fms-text-small, .85rem); margin: 0; }
+.geofence-type-option:has(input:checked) { border-color: var(--fms-primary); background: var(--fms-primary-soft); font-weight: 600; }
+.geofence-type-option input { margin: 0; }
