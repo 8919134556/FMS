@@ -1,0 +1,35 @@
+{% load fms_extras %}
+{% comment %}Recent Activity — the latest alerts + today's GPS trips (apps.core.dashboard_services.recent_activity_feed).{% endcomment %}
+{% if live_fleet or alerts_info %}
+<section class="ov ov--recent" aria-label="Recent activity">
+  {% comment %}============ Recent activity (alerts + today's trips) ============{% endcomment %}
+  {% if live_fleet or alerts_info %}
+      <div class="ov-card ov-recent">
+        <div class="ov-card-head">
+          <div><h3 class="ov-h3">Recent Activity</h3><p class="ov-sub">Latest alerts and today's trips</p></div>
+          {% if alerts_info %}<a href="{% url 'alerts:alert_report' %}" class="ov-link">View all <i class="bi bi-arrow-right"></i></a>{% endif %}
+        </div>
+        {% if activity_feed %}
+          <ol class="ov-timeline">
+            {% for item in activity_feed %}
+              <li class="ov-tl ov-tl--{% if item.kind == 'alert' %}{{ item.level|lower }}{% else %}trip{% endif %}">
+                <span class="ov-tl-icon"><i class="bi {% if item.kind == 'trip' %}{% if item.active %}bi-play-fill{% else %}bi-flag-fill{% endif %}{% elif item.level == 'CRITICAL' or item.level == 'HIGH' %}bi-exclamation-octagon-fill{% elif item.level == 'MEDIUM' %}bi-exclamation-triangle-fill{% else %}bi-info-circle-fill{% endif %}"></i></span>
+                {% if item.kind == 'alert' %}<a class="ov-tl-body" href="{% url 'alerts:alert_report' %}?alert={{ item.url_alert }}">{% else %}<a class="ov-tl-body" href="{% url 'tracking:trip_report' %}">{% endif %}
+                  <span class="ov-tl-title">{{ item.title }}{% if item.vehicle %} <span class="ov-tl-vehicle">&middot; {{ item.vehicle }}</span>{% endif %}</span>
+                  <span class="ov-tl-meta">
+                    <time datetime="{{ item.at|date:'c' }}">{{ item.at|timesince }} ago</time>
+                    {% if item.kind == 'alert' %}&middot; {{ item.status }}{% if item.active %} &middot; <span class="ov-tl-live">in progress</span>{% endif %}
+                    {% elif item.distance_km is not None %}&middot; {{ item.distance_km|floatformat:1 }} km{% elif item.active %}&middot; <span class="ov-tl-live ov-tl-live--ok">in progress</span>{% endif %}
+                  </span>
+                </a>
+                {% if item.kind == 'alert' %}<span class="ov-level ov-level--{{ item.level|lower }}">{{ item.level_label }}</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          {% include "components/empty_state.html" with icon="clock-history" title="No recent activity" message="Alerts and today's trips will appear here." %}
+        {% endif %}
+      </div>
+  {% endif %}
+</section>
+{% endif %}

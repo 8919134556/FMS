@@ -1,0 +1,39 @@
+{% load fms_extras %}
+{% comment %}
+Trips — Last 7 Days (GPS-detected, the Trip Report's own detection) + Fleet Status (vehicle lifecycle).
+Shown just before Recent Activity. Viewers without GPS access keep the dispatch trips chart further down.
+{% endcomment %}
+{% if gps_week or gps_week_error or can_view_vehicle %}
+<section class="ov ov--trips" aria-label="Trips and fleet status">
+  <div class="ov-grid{% if gps_week or gps_week_error %}{% if can_view_vehicle %} ov-grid--wide{% endif %}{% endif %}">
+    {% if gps_week %}
+      <div class="ov-card">
+        <div class="ov-card-head">
+          <div><h3 class="ov-h3">Trips &mdash; Last 7 Days</h3><p class="ov-sub">GPS-detected trips and distance per day &middot; {{ gps_week.total }} trip{{ gps_week.total|pluralize }}{% if gps_week.distance_km %}, {{ gps_week.distance_km|floatformat:1 }} km{% endif %}</p></div>
+          <a href="{% url 'tracking:trip_report' %}" class="ov-link">Trip Report <i class="bi bi-arrow-right"></i></a>
+        </div>
+        {% if gps_week.total %}
+          <div class="chart-box"><canvas id="gpsTripTrendChart" role="img" aria-label="Trips and distance per day"></canvas></div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No trips in the last 7 days" message="Trips appear here once vehicles drive with the ignition on." %}
+        {% endif %}
+      </div>
+    {% elif gps_week_error %}
+      <div class="ov-card"><div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load trips.</div></div>
+    {% endif %}
+    {% if can_view_vehicle %}
+      <div class="ov-card">
+        <div class="ov-card-head">
+          <div><h3 class="ov-h3">Fleet Status</h3><p class="ov-sub">Registered vehicles by lifecycle status</p></div>
+          <a href="/fleet/vehicles/" class="ov-link">Vehicles <i class="bi bi-arrow-right"></i></a>
+        </div>
+        {% if total_vehicles %}
+          <div class="chart-box"><canvas id="fleetLifecycleChart" role="img" aria-label="Vehicles by status"></canvas></div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="truck-front" title="No vehicles yet" message="Add your first vehicle to see the fleet status breakdown." %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}

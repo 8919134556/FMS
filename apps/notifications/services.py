@@ -28,6 +28,29 @@ def unread_count(user):
 ANNOUNCE_LIMIT = 10
 
 
+def _num(value):
+    return f"{value:.0f}" if value is not None else None
+
+
+def alert_toast_detail(alert):
+    """One short line for the compact toast, from the alert's own data (the full
+    message stays in the bell / Alert Report). Falls back to ``alert.message``."""
+    category = alert.category
+    place = str(alert.content_object) if alert.object_id and alert.content_object is not None else ""
+    if category == "PANIC":
+        return "Panic button pressed"
+    if category == "OVER_SPEEDING" and alert.speed is not None:
+        return f"Speed: {_num(alert.speed)} km/h"
+    if category == "GEOFENCE_ENTRY" and place:
+        return f"Entered: {place}"
+    if category == "GEOFENCE_EXIT" and place:
+        return f"Exited: {place}"
+    if category == "GEOFENCE_SPEEDING" and alert.speed is not None:
+        limit = f" (limit {alert.speed_limit} km/h)" if alert.speed_limit else ""
+        return f"Speed: {_num(alert.speed)} km/h{limit}" + (f" · {place}" if place else "")
+    return (alert.message or alert.get_category_display()).rstrip(".")
+
+
 def unread_alert_announcements(user):
     """The user's unread alert notifications (newest first) with what the
     emergency popup shows — vehicle, driver, time, location — read from the
@@ -35,6 +58,7 @@ def unread_alert_announcements(user):
     qs = (
         Notification.objects.filter(recipient=user, is_read=False, is_archived=False, alert__isnull=False)
         .select_related("alert", "alert__vehicle", "alert__driver")
+        .prefetch_related("alert__content_object")  # the geofence, for the toast's one-line detail
         .order_by("-created_at")[:ANNOUNCE_LIMIT]
     )
     out = []
@@ -48,6 +72,7 @@ def unread_alert_announcements(user):
             "severity": alert.severity,
             "level_label": alert.get_severity_display(),
             "message": alert.message if alert.category != "PANIC" else "",
+            "detail": alert_toast_detail(alert),
             "vehicle": alert.vehicle.registration_number if alert.vehicle_id else "",
             "driver": alert.driver.get_full_name() if alert.driver_id else "",
             "occurred_at": (alert.triggered_at or alert.occurred_at).isoformat() if alert.occurred_at else None,

@@ -492,6 +492,266 @@
 }
 
 
+/* ---------------- Live Tracking page: compact header ----------------
+   Scoped to #liveTrackingRoot — the report pages reuse these classes and keep their
+   headers. A small title (~half the app's page title) with "Updated …" beside it,
+   one line of status pills, tighter gaps: the map and table start ~50px higher. */
+#liveTrackingRoot .live-header { gap: var(--fms-space-2) var(--fms-space-3); margin-bottom: var(--fms-space-2); }
+#liveTrackingRoot .live-header-title { gap: var(--fms-space-2); min-width: 0; }
+#liveTrackingRoot .live-header-title > div {
+  display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--fms-space-3); min-width: 0;
+}
+#liveTrackingRoot .live-header-title .page-title { font-size: 1rem; line-height: 1.3; letter-spacing: -0.01em; }
+#liveTrackingRoot .live-header-title .page-subtitle { font-size: var(--fms-text-small); margin: 0; }
+#liveTrackingRoot .live-header .live-header-icon { width: 28px; height: 28px; font-size: 0.85rem; }
+#liveTrackingRoot .live-status-bar { gap: var(--fms-space-2) var(--fms-space-3); margin-bottom: var(--fms-space-2); }
+#liveTrackingRoot .live-status-pills { flex-wrap: nowrap; padding-bottom: 0; } /* one line; scrolls if too narrow */
+#liveTrackingRoot .live-status-pill { flex: none; gap: 5px; padding: 4px 11px; }
+#liveTrackingRoot .live-feed-notice { margin-bottom: var(--fms-space-2); padding: var(--fms-space-2) var(--fms-space-3); }
+
+/* ---------------- Live Map popup: Vehicle Immobilizer ----------------
+   Header = the ACTUAL state (black ON / green OFF / neutral unknown — black matches the immobilized
+   map pin); footer = the COMMAND's progress as a small step tracker. Tokens only, except the
+   immobilizer black (#111827), shared with .vm--immobilized. */
+.live-immobilizer { margin: 0 0 var(--fms-space-3); }
+.live-immobilizer:empty { display: none; }
+.immo-card {
+  --immo-black: #111827;
+  --immo-accent: var(--fms-text-muted);
+  position: relative; overflow: hidden;
+  border: 1px solid var(--fms-border); border-radius: var(--fms-radius-lg, 12px);
+  background: var(--fms-card); box-shadow: var(--fms-shadow-sm);
+  transition: border-color .3s var(--fms-ease, ease), box-shadow .3s var(--fms-ease, ease);
+}
+.immo-card--on { --immo-accent: var(--immo-black); border-color: color-mix(in srgb, var(--immo-black) 55%, var(--fms-border)); }
+.immo-card--off { --immo-accent: var(--fms-success); }
+
+/* Thin indeterminate bar while a command is being sent / polled */
+.immo-busy-bar { position: absolute; inset: 0 0 auto 0; height: 2px; overflow: hidden; opacity: 0; transition: opacity .2s; z-index: 1; }
+.immo-busy-bar::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -40%;
+  background: linear-gradient(90deg, transparent, var(--fms-primary), transparent);
+  animation: immo-bar 1.3s ease-in-out infinite;
+}
+.immo-card.is-busy .immo-busy-bar { opacity: 1; }
+@keyframes immo-bar { to { left: 100%; } }
+
+/* Header: actual state */
+.immo-hero {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: var(--fms-neutral-soft); color: var(--fms-text-primary);
+  transition: background-color .35s var(--fms-ease, ease), color .35s var(--fms-ease, ease);
+}
+.immo-card--off .immo-hero { background: var(--fms-success-soft); }
+.immo-card--on .immo-hero { background: var(--immo-black); color: #fff; }
+.immo-hero-icon {
+  flex: none; width: 38px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; background: var(--fms-card); color: var(--immo-accent);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .12); transition: background-color .35s, color .35s;
+}
+.immo-card--on .immo-hero-icon { background: rgba(255, 255, 255, .12); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
+.immo-hero-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.immo-eyebrow { font-size: .64rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .65; }
+.immo-hero-state { font-size: .98rem; font-weight: 800; letter-spacing: .04em; }
+.immo-card--off .immo-hero-state { color: var(--fms-success); }
+.immo-hero-sub { font-size: .72rem; opacity: .72; }
+
+/* Body: the control */
+.immo-body { padding: 12px 14px 4px; }
+.immo-body:empty { display: none; }
+.immo-actions { display: flex; gap: 8px; }
+.immo-actions--pair .immo-action { flex: 1 1 0; }
+.immo-action {
+  flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; padding: 8px 14px; border-radius: var(--fms-radius-md, 8px);
+  font-weight: 700; font-size: .84rem; letter-spacing: .01em; cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .08s ease;
+}
+.immo-action--enable { background: var(--immo-black); color: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .3), 0 4px 12px -6px rgba(15, 23, 42, .6); }
+.immo-action--enable:hover:not(:disabled) { background: #1f2937; }
+.immo-action--disable { background: var(--fms-card); color: var(--fms-text-primary); border-color: var(--fms-border-strong, var(--fms-border)); box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+.immo-action--disable:hover:not(:disabled) { border-color: var(--fms-text-muted); background: var(--fms-card-hover, var(--fms-surface-2)); }
+.immo-action:active:not(:disabled) { transform: translateY(1px) scale(.99); }
+.immo-action:focus-visible, .immo-btn-ghost:focus-visible, .immo-retry:focus-visible { outline: 2px solid var(--fms-primary); outline-offset: 2px; }
+.immo-action:disabled { cursor: progress; opacity: .8; }
+.immo-action .spinner-border { width: .95rem; height: .95rem; border-width: .14em; }
+.immo-action--sm { min-height: 34px; flex: 0 0 auto; padding: 6px 14px; }
+
+.immo-confirm {
+  border: 1px solid var(--fms-border); border-radius: var(--fms-radius-md, 8px); padding: 10px 12px;
+  background: var(--fms-surface-2, var(--fms-card)); animation: immo-in .18s var(--fms-ease, ease-out);
+}
+.immo-confirm-title { display: flex; align-items: center; gap: 7px; font-weight: 700; color: var(--fms-text-primary); }
+.immo-confirm-text { margin: 4px 0 0; font-size: .78rem; color: var(--fms-text-secondary, var(--fms-text-muted)); }
+.immo-warn {
+  margin-top: 8px; padding: 6px 8px; border-radius: 6px; display: flex; gap: 6px; align-items: center;
+  background: var(--fms-warning-soft); color: var(--fms-text-primary); font-size: .76rem; font-weight: 600;
+}
+.immo-warn .bi { color: var(--fms-warning); }
+.immo-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.immo-btn-ghost {
+  border: 0; background: transparent; color: var(--fms-text-secondary, var(--fms-text-muted)); font-weight: 600; font-size: .8rem;
+  padding: 6px 12px; border-radius: var(--fms-radius-md, 8px); cursor: pointer;
+}
+.immo-btn-ghost:hover { background: var(--fms-neutral-soft); color: var(--fms-text-primary); }
+.immo-note { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: var(--fms-text-muted); padding-bottom: 8px; }
+.immo-note--danger { color: var(--fms-danger); }
+.immo-skeleton { padding-bottom: 8px; }
+.immo-skeleton span {
+  display: block; height: 40px; border-radius: var(--fms-radius-md, 8px);
+  background: linear-gradient(90deg, var(--fms-surface-2) 25%, var(--fms-neutral-soft) 50%, var(--fms-surface-2) 75%);
+  background-size: 200% 100%; animation: immo-shimmer 1.2s linear infinite;
+}
+@keyframes immo-shimmer { to { background-position: -200% 0; } }
+
+/* Footer: the command's progress */
+.immo-command { margin-top: 8px; padding: 10px 14px 12px; border-top: 1px dashed var(--fms-border); }
+.immo-command-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.immo-command-title { flex: none; white-space: nowrap; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--fms-text-muted); }
+.immo-command-meta { font-size: .7rem; color: var(--fms-text-muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.immo-steps { --step-line: var(--fms-border); display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; padding: 0; list-style: none; }
+.immo-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-width: 0; }
+.immo-step:not(:first-child)::before {
+  content: ""; position: absolute; top: 8px; right: 50%; width: 100%; height: 2px; background: var(--step-line);
+  transition: background-color .3s ease;
+}
+.immo-step.is-done:not(:first-child)::before, .immo-step.is-active:not(:first-child)::before,
+.immo-step.is-failed:not(:first-child)::before, .immo-step.is-timeout:not(:first-child)::before { background: var(--fms-success); }
+.immo-step-dot {
+  position: relative; z-index: 1; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--fms-card); border: 2px solid var(--fms-border); color: #fff; font-size: .62rem;
+  transition: background-color .3s ease, border-color .3s ease, transform .2s ease;
+}
+.immo-step.is-done .immo-step-dot { background: var(--fms-success); border-color: var(--fms-success); }
+.immo-step.is-active .immo-step-dot { border-color: var(--fms-primary); background: var(--fms-card); }
+.immo-step.is-active .immo-step-dot::after {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--fms-primary); animation: immo-pulse 1.1s ease-in-out infinite;
+}
+.immo-step.is-failed .immo-step-dot { background: var(--fms-danger); border-color: var(--fms-danger); transform: scale(1.08); }
+.immo-step.is-timeout .immo-step-dot { background: var(--fms-warning); border-color: var(--fms-warning); }
+.immo-step-label { font-size: .66rem; font-weight: 600; color: var(--fms-text-muted); line-height: 1.15; overflow-wrap: anywhere; }
+.immo-step.is-done .immo-step-label { color: var(--fms-text-secondary, var(--fms-text-primary)); }
+.immo-step.is-active .immo-step-label { color: var(--fms-primary); }
+.immo-step.is-failed .immo-step-label { color: var(--fms-danger); }
+.immo-step.is-timeout .immo-step-label { color: var(--fms-warning); }
+@keyframes immo-pulse { 50% { transform: scale(.55); opacity: .55; } }
+
+.immo-feedback {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 7px 10px; border-radius: var(--fms-radius-md, 8px);
+  font-size: .76rem; line-height: 1.35; transition: background-color .25s ease;
+}
+.immo-feedback > span { flex: 1; min-width: 0; }
+.immo-feedback .spinner-border { width: .8rem; height: .8rem; border-width: .13em; flex: none; color: var(--fms-primary); }
+.immo-feedback .bi { flex: none; font-size: .9rem; }
+.immo-feedback--progress, .immo-feedback--info { background: var(--fms-primary-soft, var(--fms-neutral-soft)); color: var(--fms-text-primary); }
+.immo-feedback--info .bi { color: var(--fms-primary); }
+.immo-feedback--success { background: var(--fms-success-soft); color: var(--fms-text-primary); }
+.immo-feedback--success .bi { color: var(--fms-success); }
+.immo-feedback--danger { background: var(--fms-danger-soft); color: var(--fms-text-primary); }
+.immo-feedback--danger .bi { color: var(--fms-danger); }
+.immo-feedback--warning { background: var(--fms-warning-soft); color: var(--fms-text-primary); }
+.immo-feedback--warning .bi { color: var(--fms-warning); }
+.immo-retry {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid currentColor; background: var(--fms-card); color: var(--fms-text-primary); font-size: .72rem; font-weight: 700;
+}
+.immo-retry:hover { background: var(--fms-text-primary); color: var(--fms-card); }
+.immo-notice { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: .72rem; color: var(--fms-warning); }
+.immo-notice--danger { color: var(--fms-danger); }
+.immo-pop { animation: immo-pop .32s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes immo-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes immo-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 575.98px) {
+  .immo-hero { padding: 10px 12px; }
+  .immo-body { padding: 10px 12px 2px; }
+  .immo-command { padding: 10px 12px 12px; }
+  .immo-command-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .immo-command-meta { text-align: left; }
+  .immo-actions--pair { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .immo-busy-bar::after, .immo-step.is-active .immo-step-dot::after, .immo-skeleton span { animation: none; }
+  .immo-confirm, .immo-pop { animation: none; }
+}
+
+/* ---------------- Direction (popup + panel): compass + label ---------------- */
+.live-direction { display: inline-flex; align-items: center; gap: 8px; text-align: right; }
+.live-direction-text { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.live-direction-main { font-weight: 600; color: var(--fms-text-primary); }
+.live-direction-sub { font-size: .7rem; color: var(--fms-text-muted); }
+.vm-compass {
+  position: relative; flex: none; display: inline-block; border-radius: 50%;
+  border: 1.5px solid var(--fms-border-strong, var(--fms-border)); background: var(--fms-card);
+  box-shadow: inset 0 0 0 3px var(--fms-surface-2, transparent);
+}
+.vm-compass-n { position: absolute; top: 1px; left: 50%; transform: translateX(-50%); font-size: 7px; font-weight: 800; color: var(--fms-text-muted); line-height: 1; }
+.vm-compass-needle {
+  position: absolute; inset: 0; transition: transform .8s cubic-bezier(.33, 0, .2, 1);
+}
+.vm-compass-needle::before {
+  content: ""; position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 11px solid var(--fms-text-muted);
+}
+.vm-compass.is-moving .vm-compass-needle::before { border-bottom-color: var(--fms-success); }
+.vm-compass.is-unknown { opacity: .55; }
+
+/* ---------------- Live Tracking status filters (All / Moving / Idle / Stale / Offline) ----------------
+   Scoped to #liveStatusPills (the reports reuse .live-status-pill and keep their look). Each pill gets
+   its status colour from data-tone: a soft tint when inactive, a stronger tint + coloured border and a
+   solid count badge when selected. "Stale" = reporting, but not recently (connection STALE). */
+#liveStatusPills .live-status-pill {
+  --pill-bg: #eff6ff; --pill-bg-hover: #e4efff; --pill-bg-active: #dbeafe;
+  --pill-fg: #1e40af; --pill-bd: #dbeafe; --pill-bd-active: #93c5fd; --pill-solid: #2563eb;
+  gap: 7px;
+  padding: 5px 7px 5px 12px;
+  border: 1px solid var(--pill-bd);
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  font-weight: 600;
+  box-shadow: none;
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, color .18s ease, transform .12s ease;
+}
+#liveStatusPills .live-status-pill[data-tone="moving"] { --pill-bg: #f0fdf4; --pill-bg-hover: #e6f9ed; --pill-bg-active: #dcfce7; --pill-fg: #166534; --pill-bd: #d1fae0; --pill-bd-active: #86efac; --pill-solid: #16a34a; }
+#liveStatusPills .live-status-pill[data-tone="idle"] { --pill-bg: #fffbeb; --pill-bg-hover: #fef6d8; --pill-bg-active: #fef3c7; --pill-fg: #92400e; --pill-bd: #fdefc3; --pill-bd-active: #fcd34d; --pill-solid: #d97706; }
+#liveStatusPills .live-status-pill[data-tone="stale"] { --pill-bg: #fff7ed; --pill-bg-hover: #fff0de; --pill-bg-active: #ffedd5; --pill-fg: #9a3412; --pill-bd: #fde4c8; --pill-bd-active: #fdba74; --pill-solid: #ea580c; }
+#liveStatusPills .live-status-pill[data-tone="offline"] { --pill-bg: #f8fafc; --pill-bg-hover: #f1f5f9; --pill-bg-active: #e9eef5; --pill-fg: #334155; --pill-bd: #e2e8f0; --pill-bd-active: #94a3b8; --pill-solid: #64748b; }
+#liveStatusPills .live-status-pill .bi { font-size: .85rem; opacity: .9; }
+#liveStatusPills .live-status-pill:hover { background: var(--pill-bg-hover); color: var(--pill-fg); border-color: var(--pill-bd-active); }
+#liveStatusPills .live-status-pill:active { transform: scale(.98); }
+#liveStatusPills .live-status-pill:focus-visible { outline: 2px solid var(--pill-solid); outline-offset: 2px; }
+#liveStatusPills .live-status-pill.active {
+  background: var(--pill-bg-active);
+  border-color: var(--pill-bd-active);
+  color: var(--pill-fg);
+  box-shadow: 0 0 0 1px var(--pill-bd-active), 0 1px 2px rgba(15, 23, 42, .06);
+}
+#liveStatusPills .live-status-pill-count {
+  min-width: 22px; text-align: center; padding: 1px 7px; border-radius: 999px;
+  font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, .75); color: var(--pill-fg);
+  box-shadow: inset 0 0 0 1px var(--pill-bd);
+  transition: background-color .18s ease, color .18s ease;
+}
+#liveStatusPills .live-status-pill.active .live-status-pill-count { background: var(--pill-solid); color: #fff; box-shadow: none; }
+@media (prefers-color-scheme: dark) {
+
+  :root:not([data-theme="light"]) #liveStatusPills .live-status-pill[data-tone="all"] { --pill-bg: rgba(59, 130, 246, .10); --pill-bg-hover: rgba(59, 130, 246, .16); --pill-bg-active: rgba(59, 130, 246, .22); --pill-fg: #93c5fd; --pill-bd: rgba(59, 130, 246, .22); --pill-bd-active: rgba(96, 165, 250, .7); --pill-solid: #3b82f6; }
+  :root:not([data-theme="light"]) #liveStatusPills .live-status-pill[data-tone="moving"] { --pill-bg: rgba(34, 197, 94, .10); --pill-bg-hover: rgba(34, 197, 94, .16); --pill-bg-active: rgba(34, 197, 94, .22); --pill-fg: #86efac; --pill-bd: rgba(34, 197, 94, .22); --pill-bd-active: rgba(74, 222, 128, .7); --pill-solid: #22c55e; }
+  :root:not([data-theme="light"]) #liveStatusPills .live-status-pill[data-tone="idle"] { --pill-bg: rgba(245, 158, 11, .10); --pill-bg-hover: rgba(245, 158, 11, .16); --pill-bg-active: rgba(245, 158, 11, .22); --pill-fg: #fcd34d; --pill-bd: rgba(245, 158, 11, .22); --pill-bd-active: rgba(251, 191, 36, .7); --pill-solid: #f59e0b; }
+  :root:not([data-theme="light"]) #liveStatusPills .live-status-pill[data-tone="stale"] { --pill-bg: rgba(249, 115, 22, .10); --pill-bg-hover: rgba(249, 115, 22, .16); --pill-bg-active: rgba(249, 115, 22, .22); --pill-fg: #fdba74; --pill-bd: rgba(249, 115, 22, .22); --pill-bd-active: rgba(251, 146, 60, .7); --pill-solid: #f97316; }
+  :root:not([data-theme="light"]) #liveStatusPills .live-status-pill[data-tone="offline"] { --pill-bg: rgba(148, 163, 184, .10); --pill-bg-hover: rgba(148, 163, 184, .16); --pill-bg-active: rgba(148, 163, 184, .22); --pill-fg: #cbd5e1; --pill-bd: rgba(148, 163, 184, .22); --pill-bd-active: rgba(148, 163, 184, .7); --pill-solid: #64748b; }
+  :root:not([data-theme="light"]) #liveStatusPills .live-status-pill-count { background: rgba(255, 255, 255, .08); }
+}
+:root[data-theme="dark"] #liveStatusPills .live-status-pill[data-tone="all"] { --pill-bg: rgba(59, 130, 246, .10); --pill-bg-hover: rgba(59, 130, 246, .16); --pill-bg-active: rgba(59, 130, 246, .22); --pill-fg: #93c5fd; --pill-bd: rgba(59, 130, 246, .22); --pill-bd-active: rgba(96, 165, 250, .7); --pill-solid: #3b82f6; }
+:root[data-theme="dark"] #liveStatusPills .live-status-pill[data-tone="moving"] { --pill-bg: rgba(34, 197, 94, .10); --pill-bg-hover: rgba(34, 197, 94, .16); --pill-bg-active: rgba(34, 197, 94, .22); --pill-fg: #86efac; --pill-bd: rgba(34, 197, 94, .22); --pill-bd-active: rgba(74, 222, 128, .7); --pill-solid: #22c55e; }
+:root[data-theme="dark"] #liveStatusPills .live-status-pill[data-tone="idle"] { --pill-bg: rgba(245, 158, 11, .10); --pill-bg-hover: rgba(245, 158, 11, .16); --pill-bg-active: rgba(245, 158, 11, .22); --pill-fg: #fcd34d; --pill-bd: rgba(245, 158, 11, .22); --pill-bd-active: rgba(251, 191, 36, .7); --pill-solid: #f59e0b; }
+:root[data-theme="dark"] #liveStatusPills .live-status-pill[data-tone="stale"] { --pill-bg: rgba(249, 115, 22, .10); --pill-bg-hover: rgba(249, 115, 22, .16); --pill-bg-active: rgba(249, 115, 22, .22); --pill-fg: #fdba74; --pill-bd: rgba(249, 115, 22, .22); --pill-bd-active: rgba(251, 146, 60, .7); --pill-solid: #f97316; }
+:root[data-theme="dark"] #liveStatusPills .live-status-pill[data-tone="offline"] { --pill-bg: rgba(148, 163, 184, .10); --pill-bg-hover: rgba(148, 163, 184, .16); --pill-bg-active: rgba(148, 163, 184, .22); --pill-fg: #cbd5e1; --pill-bd: rgba(148, 163, 184, .22); --pill-bd-active: rgba(148, 163, 184, .7); --pill-solid: #64748b; }
+:root[data-theme="dark"] #liveStatusPills .live-status-pill-count { background: rgba(255, 255, 255, .08); }
+@media (prefers-reduced-motion: reduce) { #liveStatusPills .live-status-pill, #liveStatusPills .live-status-pill-count { transition: none; } }
+
 /* ---------------- Vehicle table: Live Map action ---------------- */
 
 .live-map-cell { width: 1%; white-space: nowrap; text-align: right; }
@@ -578,7 +838,19 @@
   min-width: 140px;
 }
 .live-geofence-legend.d-none { display: none; }
-.live-geofence-legend-title { font-weight: 700; color: var(--fms-text-primary); margin-bottom: 2px; }
+.live-geofence-legend-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.live-geofence-legend-title { font-weight: 700; color: var(--fms-text-primary); }
+.live-geofence-legend-btn {
+  flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: var(--fms-radius-sm, 6px);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; line-height: 1;
+  background: transparent; color: var(--fms-text-muted); cursor: pointer;
+}
+.live-geofence-legend-btn:hover { background: var(--fms-neutral-soft); color: var(--fms-text-primary); }
+.live-geofence-legend-btn:focus-visible { outline: 2px solid var(--fms-primary); outline-offset: 1px; }
+/* Minimized: only the "Geofences" header stays (the panel only — shapes and alerts are unaffected). */
+.live-geofence-legend.is-collapsed { min-width: 0; padding: 4px 6px 4px 10px; }
+.live-geofence-legend.is-collapsed .live-geofence-legend-head { margin-bottom: 0; }
+.live-geofence-legend.is-collapsed .live-geofence-legend-items { display: none; }
 .live-geofence-legend .swatch {
   display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 3px;
   border: 2px solid var(--swatch); background: color-mix(in srgb, var(--swatch) 20%, transparent);
@@ -588,3 +860,110 @@
 .geofence-tip-title { font-weight: 700; margin-bottom: 2px; }
 .geofence-popup .leaflet-popup-content { margin: 10px 14px; }
 @media (max-width: 575.98px) { .live-geofence-legend { bottom: 12px; right: 8px; } }
+@media (max-width: 767.98px) { .live-geofence-legend-btn { width: 28px; height: 28px; font-size: 0.8rem; } } /* touch target */
+
+/* ---------------- Vehicle markers (static/js/vehicle_icons.js) ----------------
+   ONE pin + ONE vehicle graphic. The graphic (white face + illustration) = vehicle
+   TYPE and never changes colour; the pin colour (--vm-pin) = STATUS:
+   alert red > moving green > idle amber > ignition off grey (offline grey, faded).
+   Only the graphic turns to the GPS heading. 48x60, anchored at the tip. */
+.vm-icon { background: none; border: 0; }
+.vm {
+  --vm-pin: var(--fms-text-muted);
+  position: relative; width: 48px; height: 60px;
+  transform-origin: 24px 58px; transition: transform var(--fms-duration-base, .2s) var(--fms-ease, ease);
+}
+.vm--moving { --vm-pin: var(--fms-success); }
+.vm--idle { --vm-pin: var(--fms-warning); }
+.vm--stopped, .vm--offline { --vm-pin: var(--fms-text-muted); }
+.vm.vm--alert { --vm-pin: var(--fms-danger); } /* wins over every movement state */
+/* Immobilizer ON (actual state from the device data): black — wins over everything. An alert keeps its
+   red halo (.vm--alert::before) and its tooltip line, so it stays visible on a black pin. */
+.vm.vm--immobilized { --vm-pin: #111827; }
+/* Explicit stacking: ".leaflet-map-pane svg" (Leaflet) lifts every SVG in the map to z-index 200. */
+.vm .vm-pin {
+  position: absolute; inset: 0; width: 48px; height: 60px; overflow: visible; z-index: 1;
+  filter: drop-shadow(0 3px 4px rgba(15, 23, 42, .28)) drop-shadow(0 1px 1px rgba(15, 23, 42, .18));
+}
+.vm-pin-shape { fill: var(--vm-pin); stroke: #fff; stroke-width: 1.5; transition: fill .5s ease; }
+/* The vehicle graphic, centred on the face (24,24); rotated to the heading by vehicle_icons.js */
+.vm-art {
+  position: absolute; left: 10px; top: 10px; width: 28px; height: 28px; z-index: 2;
+  display: flex; align-items: center; justify-content: center; pointer-events: none;
+}
+.vm-art .vehicle-type-svg { width: 28px; height: 28px; position: static; z-index: auto; }
+.vm--offline:not(.vm--alert) .vm-pin, .vm--offline:not(.vm--alert) .vm-art { opacity: .7; }
+.vm--stale .vm-pin, .vm--stale .vm-art { opacity: .8; }
+/* Active alert: a slow, soft halo behind the pin face — attention without flashing */
+.vm--alert::before {
+  content: ""; position: absolute; left: 4px; top: 4px; width: 40px; height: 40px; border-radius: 50%; z-index: 0;
+  background: color-mix(in srgb, var(--fms-danger) 30%, transparent); animation: vm-alert 2.6s ease-out infinite;
+}
+@keyframes vm-alert { 0% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1.45); opacity: 0; } }
+/* Direction arrow: a small chevron on the face's rim, pointing where the vehicle is going
+   (rotated with the graphic around the face centre 24,24). Shown only while moving. */
+.vm-dir {
+  position: absolute; left: 0; top: 0; width: 48px; height: 48px; z-index: 3; pointer-events: none;
+  display: none; transform-origin: 24px 24px; transition: transform .8s cubic-bezier(.33, 0, .2, 1);
+}
+.vm.has-dir .vm-dir { display: block; }
+.vm-dir i {
+  position: absolute; left: 50%; top: -9px; transform: translateX(-50%); width: 0; height: 0;
+  /* a darker shade of the pin colour + a white halo, so it stands out even where it overlaps the pin */
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+  border-bottom: 12px solid color-mix(in srgb, var(--vm-pin) 72%, #0f172a);
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 1px 2px rgba(15, 23, 42, .45));
+  transition: border-bottom-color .5s ease;
+}
+.vm-zoom-far .vm-dir i { border-left-width: 9px; border-right-width: 9px; border-bottom-width: 13px; top: -10px; }
+/* Selected: a soft ring around the face */
+.vm-ring {
+  position: absolute; left: -2px; top: -2px; width: 52px; height: 52px; border-radius: 50%; opacity: 0; z-index: 0;
+  border: 2px solid var(--vm-pin); background: color-mix(in srgb, var(--vm-pin) 14%, transparent);
+  transform: scale(.85); transition: opacity .2s ease, transform .2s ease;
+}
+.vm.is-selected .vm-ring { opacity: 1; transform: scale(1); animation: vm-ring 2.4s ease-in-out infinite; }
+@keyframes vm-ring { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--vm-pin) 18%, transparent); } }
+/* Label pill under the tip (hover / selected / close zoom) */
+.vm-label {
+  position: absolute; top: 62px; left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+  display: none; align-items: center; gap: 3px; z-index: 5;
+  font: 600 11px/1 var(--fms-font-sans, system-ui, sans-serif); letter-spacing: .01em;
+  padding: 4px 9px; border-radius: 999px;
+  color: #0f172a; background: #fff; border: 1px solid color-mix(in srgb, var(--vm-pin) 45%, #fff);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .22);
+}
+.vm-label-extra { color: #475569; font-weight: 500; }
+.leaflet-marker-icon:hover .vm-label, .vm.is-selected .vm-label, .vm-zoom-near .vm-label { display: inline-flex; }
+.leaflet-marker-icon:hover .vm { transform: translateY(-2px); }
+/* Zoomed out: compact pins */
+.vm-zoom-far .vm { transform: scale(.72); }
+.vm-zoom-far .vm--alert::before { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .vm, .vm-art, .vm-ring, .vm-dir { transition: none; }
+  .vm.is-selected .vm-ring, .vm--alert::before { animation: none; }
+  .vm-pin-shape { transition: none; }
+}
+/* Hover tooltip (Leaflet tooltip, restyled) */
+.vm-tooltip { padding: 8px 11px; border-radius: 10px; border: 1px solid var(--fms-border); box-shadow: var(--fms-shadow-md); }
+.vm-tip-reg { font-weight: 700; font-size: .84rem; color: var(--fms-text-primary); }
+.vm-tip-type { font-size: .74rem; color: var(--fms-text-muted); margin-bottom: 4px; }
+.vm-tip-status { font-size: .78rem; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.vm-tip-speed { font-size: .76rem; color: var(--fms-text-secondary, #475569); margin-top: 2px; }
+.vm-tip-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.vm-tip-dir { font-size: .74rem; color: var(--fms-text-secondary, #475569); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.vm-tip-immo { font-size: .76rem; font-weight: 600; color: var(--fms-text-primary); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.vm-tip-alert { font-size: .76rem; font-weight: 600; color: var(--fms-danger); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+/* Chips (table, panel, popup): the marker's face — white face + illustration, neutral ring */
+.vehicle-type-badge {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none;
+  border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1.5px var(--fms-border), 0 1px 2px rgba(15, 23, 42, .15);
+}
+#liveVehicleModalIcon { background: #fff; box-shadow: inset 0 0 0 1.5px var(--fms-border); }
+.vm-status-text { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.vm-status-text .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.vm-status-text--moving { color: var(--fms-success); }
+.vm-status-text--idle { color: var(--fms-warning); }
+.vm-status-text--stopped { color: var(--fms-text-muted); }
+.vm-status-text--alert { color: var(--fms-danger); }
+.vm-status-text--offline { color: var(--fms-text-muted); }

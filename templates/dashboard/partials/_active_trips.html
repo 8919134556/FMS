@@ -1,6 +1,38 @@
 {% load fms_extras %}
   {% comment %}============ Section 3: Live Operational Board ============{% endcomment %}
-  {% if can_view_trip %}
+  {% if gps_week %}
+    {# Trips in progress now, as the vehicles' own ignition + movement history shows them (Trip Report). #}
+    <div class="table-card mt-4">
+      <div class="table-card-header">
+        <span class="section-title">Today's Active Trips</span>
+        <a href="{% url 'tracking:trip_report' %}" class="btn btn-sm btn-outline-secondary">Trip Report</a>
+      </div>
+      {% if gps_week.active %}
+        <div class="table-responsive-fms">
+          <table class="table">
+            <thead><tr><th>Vehicle</th><th>Driver</th><th>Started</th><th>From</th><th class="text-end">Duration</th><th class="text-end">Distance</th><th class="text-end">Action</th></tr></thead>
+            <tbody>
+              {% for trip in gps_week.active %}
+                <tr>
+                  <td><strong>{{ trip.vehicle }}</strong> <span class="ms-1">{% include "components/status_badge.html" with status="IN_PROGRESS" label="In progress" %}</span></td>
+                  <td class="cell-secondary">{{ trip.driver|default:"Unassigned" }}</td>
+                  <td class="cell-secondary">{{ trip.start_at|date:"d M, H:i" }}</td>
+                  <td class="cell-secondary text-truncate" style="max-width: 280px;" title="{{ trip.start_location }}">{{ trip.start_location|default:"—" }}</td>
+                  <td class="cell-secondary text-end">{{ trip.duration_text }}</td>
+                  <td class="cell-secondary text-end">{% if trip.distance_km is not None %}{{ trip.distance_km|floatformat:1 }} km{% else %}—{% endif %}</td>
+                  <td class="text-end"><a href="{% url 'tracking:live_map' %}" class="btn btn-sm btn-outline-secondary">Live Map</a></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        {% include "components/empty_state.html" with icon="signpost-split" title="No vehicle is on a trip right now" message="Trips in progress appear here while vehicles drive with the ignition on." %}
+      {% endif %}
+    </div>
+  {% elif gps_week_error %}
+    <div class="table-card mt-4"><div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load active trips.</div></div>
+  {% elif can_view_trip %}
     <div class="table-card mt-4">
       <div class="table-card-header">
         <span class="section-title">{{ date_range_label }}'s Active Trips</span>

@@ -23,6 +23,16 @@ urlpatterns = [
         name="vehicle-telemetry-current",
     ),
     path(
+        "vehicles/<uuid:vehicle_uuid>/immobilizer/",
+        api_views.VehicleImmobilizerView.as_view(),
+        name="vehicle-immobilizer",
+    ),
+    path(
+        "immobilizer-commands/<uuid:command_uuid>/",
+        api_views.ImmobilizerCommandStatusView.as_view(),
+        name="immobilizer-command-status",
+    ),
+    path(
         "vehicles/<uuid:vehicle_uuid>/telemetry/history/",
         api_views.VehicleTelemetryHistoryView.as_view(),
         name="vehicle-telemetry-history",

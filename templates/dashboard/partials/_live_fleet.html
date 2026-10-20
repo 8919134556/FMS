@@ -1,0 +1,77 @@
+{% load fms_extras %}
+{% comment %}
+Fleet Overview — the dashboard's first screen. Every number is real and permission-gated
+(apps.core.dashboard_services); nothing here is invented or simulated:
+  live_fleet      <- the Live Tracking fleet feed, same status rule as the map markers (tracking_device.view)
+  fleet_activity  <- per-hour counts from the stored GPS history + alerts (last 24 h)
+  trip_activity   <- the Trip Report's own trip detection (today)
+  alerts_info     <- the Alert Report's scoping (alert.view)
+The KPI cards and the donut refresh in place every 30 s from the same feed the
+Live Tracking page polls (static/js/dashboard_live.js) — one request at a time, paused in hidden tabs.
+{% endcomment %}
+{% if live_fleet or live_fleet_error or alerts_info %}
+<section class="ov" id="dashboardLiveFleet" aria-label="Fleet overview"
+         {% if live_fleet %}data-fleet-api-url="{% url 'fleet-telemetry-current' %}"{% endif %}>
+
+  <div class="ov-bar">
+    <div class="ov-bar-title">
+      <h2 class="ov-h2">Fleet status</h2>
+      {% if live_fleet %}
+        <span class="ov-live" id="dashboardLiveState"><span class="ov-live-dot" aria-hidden="true"></span>Live</span>
+        <span class="ov-updated" id="dashboardLiveUpdated" role="status" aria-live="polite">updates every 30 s</span>
+        <span class="ov-stale d-none" id="dashboardFeedStale"><i class="bi bi-exclamation-triangle-fill"></i>Data feed delayed — positions may be out of date</span>
+      {% endif %}
+    </div>
+    {% if live_fleet %}
+      <div class="ov-bar-actions">
+        <a href="{% url 'tracking:live_map' %}" class="btn btn-sm ov-btn-primary"><i class="bi bi-broadcast me-1"></i>Live Tracking</a>
+      </div>
+    {% endif %}
+  </div>
+
+  {% comment %}============ KPI cards ============{% endcomment %}
+  {% if live_fleet_error %}
+    <div class="card-fms"><div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load the live fleet status.</div></div>
+  {% endif %}
+  <div class="ov-kpis">
+    {% if live_fleet %}
+      <a class="ov-kpi ov-kpi--total" href="{% if can_view_vehicle %}/fleet/vehicles/{% else %}{% url 'tracking:live_map' %}{% endif %}">
+        <div class="ov-kpi-head"><span class="ov-kpi-icon"><i class="bi bi-truck-front-fill"></i></span><span class="ov-kpi-label">Total Vehicles</span></div>
+        <div class="ov-kpi-value">{% if fleet_connectivity %}{{ fleet_connectivity.total_tracked|add:fleet_connectivity.no_telemetry }}{% else %}{{ live_fleet.tracked }}{% endif %}</div>
+        <div class="ov-kpi-foot"><span data-live-count="tracked">{{ live_fleet.tracked }}</span> with GPS{% if fleet_connectivity.no_telemetry %} &middot; {{ fleet_connectivity.no_telemetry }} without data{% endif %}</div>
+      </a>
+      <a class="ov-kpi ov-kpi--moving" href="{% url 'tracking:live_map' %}?status=moving">
+        <div class="ov-kpi-head"><span class="ov-kpi-icon"><i class="bi bi-play-circle-fill"></i></span><span class="ov-kpi-label">Moving</span></div>
+        <div class="ov-kpi-value" data-live-count="moving">{{ live_fleet.moving }}</div>
+        <div class="ov-kpi-foot"><span class="ov-dot"></span><span data-live-pct="moving">{{ live_fleet.share.moving }}</span>% of tracked</div>
+      </a>
+      <a class="ov-kpi ov-kpi--idle" href="{% url 'tracking:live_map' %}?status=idle">
+        <div class="ov-kpi-head"><span class="ov-kpi-icon"><i class="bi bi-pause-circle-fill"></i></span><span class="ov-kpi-label">Idle</span></div>
+        <div class="ov-kpi-value" data-live-count="idle">{{ live_fleet.idle }}</div>
+        <div class="ov-kpi-foot"><span class="ov-dot"></span>Stationary, ignition on</div>
+      </a>
+      <a class="ov-kpi ov-kpi--stopped" href="{% url 'tracking:live_map' %}">
+        <div class="ov-kpi-head"><span class="ov-kpi-icon"><i class="bi bi-power"></i></span><span class="ov-kpi-label">Ignition Off</span></div>
+        <div class="ov-kpi-value" data-live-count="stopped">{{ live_fleet.stopped }}</div>
+        <div class="ov-kpi-foot"><span class="ov-dot"></span>Reporting, engine off</div>
+      </a>
+    {% endif %}
+    {% if alerts_info %}
+      <a class="ov-kpi ov-kpi--alerts{% if alerts_info.open_total %} has-alerts{% endif %}" href="{% url 'alerts:alert_report' %}">
+        <div class="ov-kpi-head"><span class="ov-kpi-icon"><i class="bi bi-bell-fill"></i></span><span class="ov-kpi-label">Active Alerts</span></div>
+        <div class="ov-kpi-value">{{ alerts_info.open_total }}</div>
+        <div class="ov-kpi-foot">{% if alerts_info.open_total %}<span class="ov-dot"></span>{% if alerts_info.active_now %}{{ alerts_info.active_now }} in progress now{% else %}Awaiting review{% endif %}{% else %}No open alerts{% endif %}</div>
+      </a>
+    {% elif alerts_info_error %}
+      <div class="ov-kpi"><div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Alerts unavailable</div></div>
+    {% endif %}
+    {% if live_fleet %}
+      <a class="ov-kpi ov-kpi--offline" href="{% url 'tracking:live_map' %}?status=offline">
+        <div class="ov-kpi-head"><span class="ov-kpi-icon"><i class="bi bi-wifi-off"></i></span><span class="ov-kpi-label">Offline</span></div>
+        <div class="ov-kpi-value" data-live-count="offline">{{ live_fleet.offline }}</div>
+        <div class="ov-kpi-foot"><span class="ov-dot"></span>No update for {{ offline_minutes }}+ min</div>
+      </a>
+    {% endif %}
+  </div>
+</section>
+{% endif %}

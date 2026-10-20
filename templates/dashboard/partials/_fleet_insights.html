@@ -1,0 +1,98 @@
+{% load fms_extras %}
+{% comment %}
+Fleet insights — the overview's charts and summaries, shown below the Operations cards:
+today's performance, 24 h activity, status distribution, 7-day alerts and recent activity.
+Same data and permission gates as the Fleet status cards (_live_fleet.html).
+{% endcomment %}
+{% if live_fleet or alerts_info %}
+<section class="ov ov--insights" aria-label="Fleet insights">
+  {% comment %}============ Performance summary (today) ============{% endcomment %}
+  {% if trip_activity_error %}
+    <div class="ov-card mt-3"><div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load today's trips.</div></div>
+  {% elif trip_activity %}
+    <div class="ov-card ov-perf">
+      <div class="ov-card-head">
+        <div><h3 class="ov-h3">Today's Performance</h3><p class="ov-sub">From ignition &amp; movement history &middot; same detection as the Trip Report</p></div>
+        <a href="{% url 'tracking:trip_report' %}" class="ov-link">Trip Report <i class="bi bi-arrow-right"></i></a>
+      </div>
+      <div class="ov-perf-grid">
+        <div class="ov-metric"><span class="ov-metric-icon"><i class="bi bi-signpost-split"></i></span><div><span class="ov-metric-label">Trips</span><span class="ov-metric-value">{{ trip_activity.total_trips }}</span><span class="ov-metric-sub">{{ trip_activity.active_trips }} in progress</span></div></div>
+        <div class="ov-metric"><span class="ov-metric-icon"><i class="bi bi-geo"></i></span><div><span class="ov-metric-label">Distance</span><span class="ov-metric-value">{% if trip_activity.distance_km is not None %}{{ trip_activity.distance_km|floatformat:1 }}{% else %}0{% endif %} <small>km</small></span><span class="ov-metric-sub">avg. trip {{ trip_activity.avg_duration_text }}</span></div></div>
+        <div class="ov-metric"><span class="ov-metric-icon"><i class="bi bi-speedometer2"></i></span><div><span class="ov-metric-label">Avg. moving speed</span><span class="ov-metric-value">{% if trip_activity.avg_moving_speed_kmh is not None %}{{ trip_activity.avg_moving_speed_kmh }} <small>km/h</small>{% else %}—{% endif %}</span><span class="ov-metric-sub">{% if trip_activity.avg_moving_speed_kmh is not None %}while moving, today{% else %}no movement today{% endif %}</span></div></div>
+        <div class="ov-metric"><span class="ov-metric-icon"><i class="bi bi-pie-chart"></i></span><div><span class="ov-metric-label">Utilization</span><span class="ov-metric-value">{% if trip_activity.utilization_pct is not None %}{{ trip_activity.utilization_pct }}<small>%</small>{% else %}—{% endif %}</span><span class="ov-metric-sub">{{ trip_activity.vehicles_with_trips }} of {{ trip_activity.equipped_vehicles }} vehicles made a trip</span></div></div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% comment %}============ Fleet activity (24 h) + status distribution ============{% endcomment %}
+  {% if live_fleet %}
+    <div class="ov-grid ov-grid--wide">
+      <div class="ov-card">
+        <div class="ov-card-head">
+          <div><h3 class="ov-h3">Fleet Activity</h3><p class="ov-sub">Vehicles reporting and moving per hour &middot; last 24 hours</p></div>
+        </div>
+        {% if fleet_activity_error %}
+          <div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load fleet activity.</div>
+        {% elif fleet_activity.has_data %}
+          <div class="chart-box"><canvas id="fleetActivityChart" role="img" aria-label="Vehicles reporting and moving per hour"></canvas></div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="activity" title="No activity in the last 24 hours" message="Hourly activity appears here as soon as vehicles report positions." %}
+        {% endif %}
+      </div>
+      <div class="ov-card">
+        <div class="ov-card-head">
+          <div><h3 class="ov-h3">Status Distribution</h3><p class="ov-sub">What tracked vehicles are doing now</p></div>
+          {% if live_fleet.immobilized %}<span class="ov-chip ov-chip--dark"><i class="bi bi-shield-lock-fill"></i><span data-live-count="immobilized">{{ live_fleet.immobilized }}</span> immobilized</span>{% endif %}
+        </div>
+        {% if live_fleet.tracked %}
+          <div class="ov-donut">
+            <div class="ov-donut-chart"><canvas id="liveStatusChart" role="img" aria-label="Live status distribution"></canvas>
+              <div class="ov-donut-center" aria-hidden="true"><strong data-live-count="tracked">{{ live_fleet.tracked }}</strong><span>tracked</span></div>
+            </div>
+            <ul class="ov-legend">
+              <li class="ov-legend--moving"><span class="ov-legend-dot"></span>Moving<strong data-live-count="moving">{{ live_fleet.moving }}</strong></li>
+              <li class="ov-legend--idle"><span class="ov-legend-dot"></span>Idle<strong data-live-count="idle">{{ live_fleet.idle }}</strong></li>
+              <li class="ov-legend--stopped"><span class="ov-legend-dot"></span>Ignition off<strong data-live-count="stopped">{{ live_fleet.stopped }}</strong></li>
+              <li class="ov-legend--offline"><span class="ov-legend-dot"></span>Offline<strong data-live-count="offline">{{ live_fleet.offline }}</strong></li>
+            </ul>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="geo-alt" title="No tracked vehicles" message="Vehicles appear here once their GPS devices report." %}
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% comment %}============ Alerts: 7-day trend + open by level ============{% endcomment %}
+  {% if alerts_info %}
+    <div class="ov-grid ov-grid--wide">
+      <div class="ov-card">
+        <div class="ov-card-head">
+          <div><h3 class="ov-h3">Alerts &mdash; Last 7 Days</h3><p class="ov-sub">Vehicle alerts per day, by level &middot; {{ alerts_info.week_total }} in total</p></div>
+        </div>
+        {% if alerts_info.week_total %}
+          <div class="chart-box"><canvas id="alertTrendChart" role="img" aria-label="Alerts per day by level"></canvas></div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="shield-check" title="No alerts this week" message="Vehicle alerts from the last 7 days will be charted here." %}
+        {% endif %}
+      </div>
+      <a class="ov-card ov-card-link" href="{% url 'alerts:alert_report' %}">
+        <div class="ov-card-head">
+          <div><h3 class="ov-h3">Open Alerts by Level</h3><p class="ov-sub">Waiting to be acknowledged or resolved</p></div>
+          <span class="ov-link">Alert Report <i class="bi bi-arrow-right"></i></span>
+        </div>
+        <ul class="ov-levels">
+          {% for level, count in alerts_info.open_by_level %}
+            <li class="ov-levels-row ov-levels-row--{{ level|lower }}{% if not count %} is-zero{% endif %}">
+              <span class="ov-levels-name"><span class="ov-legend-dot"></span>{{ level|title }}</span>
+              <span class="ov-levels-bar"><span style="width: {% widthratio count alerts_info.open_total|default:1 100 %}%"></span></span>
+              <strong>{{ count }}</strong>
+            </li>
+          {% endfor %}
+        </ul>
+      </a>
+    </div>
+  {% endif %}
+
+</section>
+{% endif %}

@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
@@ -16,7 +17,19 @@ from apps.accounts.models import Role, User
 from apps.audit.models import AuditLog
 from apps.audit.services import log_action
 from apps.clients.models import Client
-from apps.core.dashboard_services import DATE_RANGE_CHOICES, DashboardService, OperationsService
+from apps.core.dashboard_services import (
+    DATE_RANGE_CHOICES,
+    LIVE_STATUS_KEYS,
+    LIVE_STATUS_LABELS,
+    DashboardService,
+    OperationsService,
+    alerts_overview,
+    fleet_activity_24h,
+    gps_trips_week,
+    live_fleet_summary,
+    recent_activity_feed,
+    todays_trip_activity,
+)
 from apps.core.forms import SystemSettingsForm
 from apps.core.models import SystemSettings
 from apps.core.permissions import ModulePermissionRequiredMixin, has_admin_access, user_has_any_permission, user_has_permission
@@ -505,6 +518,35 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 ),
             }
         )
+
+        # ---- Live fleet / today's trips / alerts (telemetry-driven, each permission-gated + isolated) ----
+        live_fleet, live_fleet_error = self._safe("live_fleet", lambda: live_fleet_summary(user))
+        trip_activity, trip_activity_error = self._safe("trip_activity", lambda: todays_trip_activity(user))
+        alerts_info, alerts_info_error = self._safe("alerts_overview", lambda: alerts_overview(user))
+        fleet_activity, fleet_activity_error = self._safe("fleet_activity", lambda: fleet_activity_24h(user))
+        gps_week, gps_week_error = self._safe("gps_trips_week", lambda: gps_trips_week(user))
+        context.update({
+            "gps_week": gps_week,
+            "gps_week_error": gps_week_error,
+            "gps_trip_trend_json": _safe_json(gps_week["trend"] if gps_week else {"labels": [], "trips": [], "distance_km": []}),
+            "fleet_activity": fleet_activity,
+            "fleet_activity_error": fleet_activity_error,
+            "fleet_activity_json": _safe_json(fleet_activity or {"labels": [], "reporting": [], "moving": [], "alerts": None}),
+            "activity_feed": recent_activity_feed(alerts_info, trip_activity),
+            "offline_minutes": settings.TELEMATICS_OFFLINE_THRESHOLD_MINUTES,
+            "live_fleet": live_fleet,
+            "live_fleet_error": live_fleet_error,
+            "trip_activity": trip_activity,
+            "trip_activity_error": trip_activity_error,
+            "alerts_info": alerts_info,
+            "alerts_info_error": alerts_info_error,
+            "live_status_json": _safe_json({
+                "keys": list(LIVE_STATUS_KEYS),
+                "labels": [LIVE_STATUS_LABELS[k] for k in LIVE_STATUS_KEYS],
+                "data": [live_fleet[k] for k in LIVE_STATUS_KEYS] if live_fleet else [],
+            }),
+            "alert_trend_json": _safe_json(alerts_info["trend"] if alerts_info else {"labels": [], "series": {}}),
+        })
         return context
 
     def _activity_trend(self, now, days):

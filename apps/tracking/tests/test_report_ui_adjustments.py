@@ -40,7 +40,7 @@ class TestLiveTrackingLiveMap:
         js = (STATIC_JS / "live_tracking.js").read_text(encoding="utf-8")
         assert 'data-live-map="${vehicle.vehicle_uuid}"' in js
         assert "event.stopPropagation();" in js  # the button doesn't also select the row
-        assert "icon: iconFor(vehicle)" in js  # same marker as the main map
+        assert "state.liveMap.marker = addVehicleMarker(map, vehicle" in js  # same marker builder as the main map
         assert "if (state.liveMap.uuid) updateLiveMap();" in js  # rides on the page's refresh
         assert "FmsMap.addTileLayer(map)" in js
 

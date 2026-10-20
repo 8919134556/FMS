@@ -66,6 +66,12 @@ ORDER BY r.unitno, r.tracktime, r.id DESC
 """
 
 
+# current_table only: the vehicle's type as comms has it (the column is spelled
+# "vechile_type" there; history_table has no such column) and the ACTUAL immobilizer
+# state (spelled "immobalizer": 1 = ON, 0 = OFF) — current_table is its source of truth.
+_CURRENT_COLUMNS = _COLUMNS + ", vechile_type, immobalizer"
+
+
 @dataclass
 class SyncReport:
     current_rows: int = 0
@@ -173,6 +179,11 @@ def row_to_event(row, tz):
             **({} if row.get("device_battery_voltage") is None
                else {"device_battery_voltage": float(row["device_battery_voltage"])}),
             **device_battery_flags(row.get("device_battery_voltage")),
+            # current_table rows only: the vehicle type, for the Live Tracking icon (kept as comms stores it).
+            **({"vehicle_type": str(row["vechile_type"]).strip()[:60]} if (row.get("vechile_type") or "").strip()
+               else {}),
+            # current_table rows only: the actual immobilizer state (1 = ON, 0 = OFF), as reported.
+            **({} if row.get("immobalizer") is None else {"immobilizer": int(row["immobalizer"]) == 1}),
         },
     )
 
@@ -272,7 +283,7 @@ def sync(*, dsn=None, history_days=DEFAULT_HISTORY_DAYS, batch_size=DEFAULT_BATC
     conn = connection or _connect(dsn)
     tz = _local_timezone()
     try:
-        current_rows = conn.execute(f"SELECT {_COLUMNS} FROM current_table").fetchall()
+        current_rows = conn.execute(f"SELECT {_CURRENT_COLUMNS} FROM current_table").fetchall()
         report.current_rows = len(current_rows)
         attach_panic_voltage(current_rows)
         apply_rows(current_rows, report, tz)

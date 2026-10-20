@@ -33,9 +33,6 @@ viewer can't open is never rendered (and its number never sent).
     {% include "components/kpi_card.html" with label="Total Documents" value=documents_total_count icon="file-earmark-text" tone="primary" href="/documents/" %}
     {% include "components/kpi_card.html" with label="Documents Expiring Soon" value=documents_expiring_soon_count icon="hourglass-split" tone="warning" href="/documents/?expiry=expiring_soon" %}
   {% endif %}
-  {% if has_any_widget or can_view_user %}
-    {% include "components/kpi_card.html" with label="Needs Attention" value=attention_items|length icon="exclamation-circle" tone="danger" %}
-  {% endif %}
   {% if can_view_user %}
     {% include "components/kpi_card.html" with label="Active Users" value=active_users icon="person-check" tone="success" href="/admin/users/?status=ACTIVE" %}
   {% endif %}

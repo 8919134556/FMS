@@ -17,6 +17,18 @@
   --fms-bg: #f6f8fc;
   --fms-bg-elevated: #ffffff;
   --fms-sidebar: #ffffff;
+  /* Left pane (navy, both themes) — static/css/components.css "Sidebar" */
+  --fms-nav-bg: #18325a;
+  --fms-nav-bg-deep: #0e2140;
+  --fms-nav-brand-bg: #112848;
+  --fms-nav-text: rgba(255, 255, 255, 0.88);
+  --fms-nav-text-strong: #ffffff;
+  --fms-nav-muted: rgba(203, 213, 225, 0.62);
+  --fms-nav-hover: rgba(255, 255, 255, 0.07);
+  --fms-nav-divider: rgba(255, 255, 255, 0.08);
+  --fms-nav-active: #35a04f;
+  --fms-nav-active-2: #2c8c44;
+  --fms-nav-accent: #4ade80;
   --fms-card: #ffffff;
   --fms-card-hover: #f8fafc;
   --fms-surface-2: #eef2f8;

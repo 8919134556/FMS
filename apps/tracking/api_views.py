@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -15,6 +16,8 @@ from apps.audit.services import log_action
 from apps.core.api_permissions import HasModulePermission
 from apps.core.scoping import scope_queryset
 from apps.core.utils import display_timezone
+from apps.core.permissions import user_has_permission
+from apps.tracking import immobilizer
 from apps.tracking import (
     location_exports,
     location_report,
@@ -29,9 +32,11 @@ from apps.tracking.authentication import (
     DeviceIngestRateThrottle,
     DeviceKeyAuthentication,
     FleetReadRateThrottle,
+    ImmobilizerCommandRateThrottle,
+    ImmobilizerStatusRateThrottle,
     IsActiveDevice,
 )
-from apps.tracking.models import VehicleCurrentTelemetry
+from apps.tracking.models import ImmobilizerCommand, VehicleCurrentTelemetry
 from apps.tracking.serializers import (
     FleetCurrentTelemetrySerializer,
     TelemetryCurrentSerializer,
@@ -154,6 +159,89 @@ class FleetCurrentTelemetryView(APIView):
             "results": serializer.data,
             # Health of the feed that keeps these rows fresh (None = not applicable).
             "sync": services.comms_sync_status(),
+        })
+
+
+class VehicleImmobilizerView(APIView):
+    """GET/POST /api/v1/tracking/vehicles/<uuid>/immobilizer/ — the Live Map popup's immobilizer panel.
+
+    GET (``tracking_device`` view): the ACTUAL state (current telemetry, from the device data) and the
+    latest command (its status refreshed from the comms API while it is in progress).
+    POST {"state": "on"|"off"} (``tracking_device`` command): sends the command to the comms API with
+    this vehicle's own device unit number; 202 with the command (status Pending + command_id).
+    Vehicles outside the caller's scope are 404."""
+
+    permission_classes = [IsAuthenticated, HasModulePermission]
+    permission_module = "tracking_device"
+
+    def get_throttles(self):
+        return [ImmobilizerCommandRateThrottle()] if self.request.method == "POST" else [ImmobilizerStatusRateThrottle()]
+
+    @property
+    def action(self):  # HasModulePermission: GET -> view, POST -> command
+        return "command" if self.request.method == "POST" else "retrieve"
+
+    def _vehicle(self, request, vehicle_uuid):
+        return get_object_or_404(
+            scope_queryset(Vehicle.objects.select_related("tracking_device"), request.user), uuid=vehicle_uuid
+        )
+
+    def _body(self, request, vehicle, command, transient=None):
+        actual, reported_at = immobilizer.actual_state(vehicle)
+        unit_no, _ = immobilizer.unit_no_for(vehicle)
+        return {
+            "vehicle_uuid": str(vehicle.uuid),
+            "registration_number": vehicle.registration_number,
+            "actual": {"immobilizer": actual, "reported_at": reported_at.isoformat() if reported_at else None},
+            "has_unit_no": bool(unit_no),
+            "service_configured": immobilizer.api_configured(),
+            "can_command": user_has_permission(request.user, "tracking_device", "command"),
+            "command": immobilizer.serialize(command),
+            "poll_interval_seconds": max(1, int(settings.IMMOBILIZER_POLL_INTERVAL_SECONDS)),
+            **({"warning": transient} if transient else {}),
+        }
+
+    def get(self, request, vehicle_uuid):
+        vehicle = self._vehicle(request, vehicle_uuid)
+        command, transient = immobilizer.latest_command(vehicle), None
+        if command is not None:
+            command, transient = immobilizer.refresh(command)
+        return Response(self._body(request, vehicle, command, transient))
+
+    def post(self, request, vehicle_uuid):
+        vehicle = self._vehicle(request, vehicle_uuid)
+        try:
+            command = immobilizer.send(vehicle=vehicle, state=request.data.get("state"), user=request.user, request=request)
+        except immobilizer.ImmobilizerError as exc:
+            body = self._body(request, vehicle, immobilizer.latest_command(vehicle))
+            return Response({**body, "detail": exc.message}, status=exc.status_code)
+        return Response(self._body(request, vehicle, command), status=202)
+
+
+class ImmobilizerCommandStatusView(APIView):
+    """GET /api/v1/tracking/immobilizer-commands/<uuid>/ — one command's status, refreshed from the
+    comms API (GET /commands/{command_id}) while in progress, plus the vehicle's ACTUAL state. By the
+    FMS command uuid (never the comms id), scoped to the caller's vehicles."""
+
+    permission_classes = [IsAuthenticated, HasModulePermission]
+    permission_module = "tracking_device"
+    action = "retrieve"
+    throttle_classes = [ImmobilizerStatusRateThrottle]
+
+    def get(self, request, command_uuid):
+        command = get_object_or_404(
+            ImmobilizerCommand.objects.select_related("vehicle", "requested_by").filter(
+                vehicle__in=scope_queryset(Vehicle.objects.all(), request.user)
+            ),
+            uuid=command_uuid,
+        )
+        command, transient = immobilizer.refresh(command)
+        actual, reported_at = immobilizer.actual_state(command.vehicle)
+        return Response({
+            "vehicle_uuid": str(command.vehicle.uuid),
+            "actual": {"immobilizer": actual, "reported_at": reported_at.isoformat() if reported_at else None},
+            "command": immobilizer.serialize(command),
+            **({"warning": transient} if transient else {}),
         })
 
 

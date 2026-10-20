@@ -161,6 +161,16 @@ def upsert_current_telemetry(*, vehicle, device, event):
         "gps_odometer": _metadata_decimal(event.metadata, "gps_odometer_km"),
         "main_power": _metadata_decimal(event.metadata, "mainpower"),
     }
+    # Only readings that carry it (comms current_table rows) set the vehicle type;
+    # every other reading leaves the stored value alone.
+    reported_type = ((event.metadata or {}).get("vehicle_type") or "").strip()
+    if reported_type:
+        defaults["vehicle_type"] = reported_type[:60]
+    # Likewise the actual immobilizer state (comms current_table "immobalizer"): only readings that
+    # carry it set it — never a command, never a reading without it.
+    reported_immobilizer = (event.metadata or {}).get("immobilizer")
+    if isinstance(reported_immobilizer, bool):
+        defaults["immobilizer"] = reported_immobilizer
     obj, created = VehicleCurrentTelemetry.objects.select_for_update().get_or_create(
         vehicle=vehicle, defaults=defaults
     )
@@ -190,6 +200,10 @@ def upsert_current_telemetry(*, vehicle, device, event):
             name for name in ("location", "gps_odometer", "main_power")
             if defaults[name] not in (None, "") and getattr(obj, name) in (None, "")
         ]
+        if reported_type and obj.vehicle_type != defaults["vehicle_type"]:
+            gaps.append("vehicle_type")  # the type changed in comms: follow it
+        if "immobilizer" in defaults and obj.immobilizer != defaults["immobilizer"]:
+            gaps.append("immobilizer")  # the immobilizer changed in comms (same reading): follow it
         for name in gaps:
             setattr(obj, name, defaults[name])
         if gaps:
@@ -400,8 +414,40 @@ def movement_state_for(current):
     return "MOVING" if current.speed > settings.TELEMATICS_MOVEMENT_SPEED_THRESHOLD_KMH else "IDLE"
 
 
+_SEVERITY_RANK = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+
+
+def active_alerts_by_vehicle(vehicle_ids):
+    """vehicle_id -> the most severe alert whose condition is still going on
+    (``signal_cleared_at`` null — the alert engine's own "active" — and not
+    resolved or archived), among ``Alert.LIVE_ATTENTION_CATEGORIES``. One
+    query. Drives the red Live Tracking pin; when the condition clears the
+    vehicle simply drops out and its pin returns to its movement colour."""
+    from apps.alerts.models import Alert
+
+    best = {}
+    rows = (
+        Alert.objects.filter(
+            vehicle_id__in=vehicle_ids, category__in=Alert.LIVE_ATTENTION_CATEGORIES,
+            signal_cleared_at__isnull=True, is_archived=False,
+        )
+        .exclude(status=Alert.Status.RESOLVED)
+        .values("vehicle_id", "category", "severity", "occurred_at")
+    )
+    labels = dict(Alert.Category.choices)
+    for row in rows:
+        current = best.get(row["vehicle_id"])
+        key = (_SEVERITY_RANK.get(row["severity"], 0), row["occurred_at"] or timezone.now())
+        if current is None or key > current[0]:
+            best[row["vehicle_id"]] = (key, {
+                "category": row["category"], "label": labels.get(row["category"], row["category"]),
+                "severity": row["severity"], "since": row["occurred_at"],
+            })
+    return {vehicle_id: value for vehicle_id, (_, value) in best.items()}
+
+
 def fleet_current_telemetry(user=None):
-    """Everything the live map needs, in two queries total regardless of
+    """Everything the live map needs, in four queries total regardless of
     fleet size — no per-vehicle N+1. Only vehicles with a
     VehicleCurrentTelemetry row are included (never a fabricated position).
 
@@ -425,6 +471,16 @@ def fleet_current_telemetry(user=None):
         ).values("vehicle_id", "uuid", "trip_number")
     }
 
+    alerts_by_vehicle = active_alerts_by_vehicle(vehicle_ids)
+    from apps.tracking.direction import directions_by_vehicle
+
+    # Direction: the device heading when it reports one, else the bearing of the GPS track (one query).
+    direction_by_vehicle = directions_by_vehicle(
+        current_rows,
+        # "moving" only while it is reporting: an offline vehicle's last reading is not live movement.
+        {row.vehicle_id: movement_state_for(row) == "MOVING" and connection_status_for(row) != "OFFLINE" for row in current_rows},
+    )
+
     results = []
     for row in current_rows:
         vehicle = row.vehicle
@@ -433,7 +489,8 @@ def fleet_current_telemetry(user=None):
                 "vehicle_uuid": vehicle.uuid,
                 "registration_number": vehicle.registration_number,
                 "availability_status": vehicle.availability_status,
-                "vehicle_type": vehicle.vehicle_type.name if vehicle.vehicle_type_id else "",
+                # The Live Tracking icon type: what comms reports for this vehicle, else its FMS Vehicle Type.
+                "vehicle_type": row.vehicle_type or (vehicle.vehicle_type.name if vehicle.vehicle_type_id else ""),
                 "client": vehicle.client.client_name if vehicle.client_id else "",
                 "driver_name": vehicle.current_driver.get_full_name() if vehicle.current_driver_id else None,
                 "latitude": row.latitude,
@@ -450,6 +507,12 @@ def fleet_current_telemetry(user=None):
                 "connection_status": connection_status_for(row),
                 "movement_state": movement_state_for(row),
                 "active_trip": active_trips_by_vehicle.get(row.vehicle_id),
+                # Most severe alert still in progress (None when there is none): the pin turns red.
+                "active_alert": alerts_by_vehicle.get(row.vehicle_id),
+                # ACTUAL immobilizer state from the device data (True = ON: black pin), None = unknown.
+                "immobilizer": row.immobilizer,
+                # Where it is heading: {degrees, cardinal, label, source: device|gps, moving} (degrees None = unknown).
+                "direction": direction_by_vehicle.get(row.vehicle_id),
             }
         )
     return results

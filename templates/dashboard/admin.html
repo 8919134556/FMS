@@ -1,14 +1,23 @@
 {% extends "dashboard/_base.html" %}
 {% load fms_extras %}
-{% block dashboard_title %}Fleet Operations{% endblock %}
+{% block dashboard_title %}Fleet Overview{% endblock %}
 {% block dashboard_body %}
-  {% include "dashboard/partials/_hero.html" with eyebrow="Admin Dashboard" title="Fleet Operations" subtitle="Real-time overview of your fleet, your team and today's activity." %}
+  {% include "dashboard/partials/_hero.html" with eyebrow="Admin Dashboard" title="Fleet Overview" subtitle="Monitor your fleet's activity and performance." %}
 
+  {% include "dashboard/partials/_live_fleet.html" %}
+
+  {% if live_fleet or alerts_info %}<h2 class="ov-section-title">Operations &amp; Administration</h2>{% endif %}
   {% include "dashboard/partials/_kpi_strip.html" %}
+  {% include "dashboard/partials/_connectivity.html" %}
 
-  {% comment %}============ Trends: trips over time + trip status mix ============{% endcomment %}
-  {% if can_view_trip %}
-    <div class="dashboard-row cols-2-wide">
+  {% include "dashboard/partials/_fleet_insights.html" %}
+  {% include "dashboard/partials/_trips_fleet_status.html" %}
+  {% include "dashboard/partials/_recent_activity.html" %}
+
+  {% comment %}============ Dispatch trips (Trips module): the chart only without GPS access, the status mix only with dispatch trips ============{% endcomment %}
+  {% if not gps_week and not gps_week_error and can_view_trip or can_view_trip and trip_status_summary.total %}
+    <div class="dashboard-row{% if not gps_week and not gps_week_error and can_view_trip and trip_status_summary.total %} cols-2-wide{% endif %}">
+      {% if not gps_week and not gps_week_error and can_view_trip %}
       <div class="card-fms chart-card dash-panel">
         <div class="dash-panel-header">
           <div>
@@ -19,6 +28,8 @@
         </div>
         <div class="chart-box"><canvas id="tripTrendChart"></canvas></div>
       </div>
+      {% endif %}
+      {% if can_view_trip and trip_status_summary.total %}
       <div class="card-fms chart-card dash-panel">
         <div class="dash-panel-header">
           <div>
@@ -26,36 +37,22 @@
             <p class="text-small text-muted-fms mb-0">Trips scheduled to start in this period</p>
           </div>
         </div>
-        {% if trip_status_summary.total %}
-          <div class="chart-box"><canvas id="tripStatusChart"></canvas></div>
-        {% else %}
-          {% include "components/empty_state.html" with icon="calendar-x" title="No trips scheduled" message="No trips are scheduled for this period." %}
-        {% endif %}
+        <div class="chart-box"><canvas id="tripStatusChart"></canvas></div>
       </div>
+      {% endif %}
     </div>
   {% endif %}
 
-  {% comment %}============ Needs attention | Notifications ============{% endcomment %}
-  <div class="dashboard-row cols-2-wide">
-    {% include "dashboard/partials/_attention.html" %}
+  {% comment %}============ Notifications ============{% endcomment %}
+  <div class="dashboard-row">
     {% include "dashboard/partials/_notifications.html" %}
   </div>
 
   {% comment %}============ Quick actions ============{% endcomment %}
   {% include "dashboard/partials/_quick_actions.html" %}
 
-  {% comment %}============ Fleet / accounts snapshot ============{% endcomment %}
-  <div class="dashboard-row cols-3">
-    {% if can_view_vehicle %}
-      <div class="card-fms chart-card dash-panel">
-        <div class="dash-panel-header"><span class="section-title" style="font-size:.95rem;">Fleet Status</span></div>
-        {% if total_vehicles %}
-          <div class="chart-box is-short"><canvas id="fleetLifecycleChart"></canvas></div>
-        {% else %}
-          {% include "components/empty_state.html" with icon="truck-front" title="No vehicles yet" message="Add your first vehicle to see the fleet status breakdown." %}
-        {% endif %}
-      </div>
-    {% endif %}
+  {% comment %}============ Accounts snapshot ============{% endcomment %}
+  <div class="dashboard-row cols-2">
     {% if can_view_role %}
       <div class="card-fms chart-card dash-panel">
         <div class="dash-panel-header">
@@ -100,7 +97,6 @@
   {% endif %}
 
   {% comment %}============ Operations: every widget below is permission-gated ============{% endcomment %}
-  {% include "dashboard/partials/_connectivity.html" %}
   {% include "dashboard/partials/_todays_ops.html" %}
   {% include "dashboard/partials/_active_trips.html" %}
   {% include "dashboard/partials/_availability.html" %}

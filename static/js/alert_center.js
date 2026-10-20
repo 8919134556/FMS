@@ -4,7 +4,7 @@
  * The bell (app.js) polls the notification feed; the feed's ``alerts`` list
  * holds the user's UNREAD notifications for vehicle alert events (a new panic
  * episode creates exactly one per user — apps.alerts.events). For each one not
- * announced before, this shows a popup and plays a short alarm ONCE:
+ * announced before, this shows a compact toast (top-right) and plays a short alarm ONCE:
  *
  *   - "once" is remembered in localStorage per notification, so a page reload,
  *     another page or a second tab never repeats it;
@@ -14,6 +14,13 @@
  *     audio context is unlocked on the first click/keypress; an alert that
  *     arrives while sound is still blocked shows "Click to enable sound" and
  *     plays as soon as the user interacts (if still recent).
+ *
+ * Toasts: newest on top, at most ``maxVisible`` at once (the oldest leaves when
+ * another arrives — every alert stays in the bell and the Alert Report), and
+ * each fades out after ``toastDurationMs`` (paused while hovered / focused).
+ * Closing one only hides it: the alert and its notification are untouched.
+ * They sit under the topbar, or under a visible ``[data-fms-toast-anchor]``
+ * (e.g. the Live Tracking map's top-right controls) so they never cover them.
  *
  * Nothing here decides what is an alert: it only presents what the server sent.
  * Fires ``fms:alert`` on window so open pages (Alert Report) can refresh at once.
@@ -30,7 +37,8 @@
   let pendingSoundAt = 0;
   let pendingUrgent = false;
   let container = null;
-  let options = { timezone: undefined, onOpen: null };
+  // Configurable via FmsAlertCenter.configure({...}).
+  let options = { timezone: undefined, onOpen: null, toastDurationMs: 7000, maxVisible: 3 };
 
   /* ---------------- Announced registry (per browser, across tabs) ---------------- */
 
@@ -120,7 +128,7 @@
     if (!ctx) return;
     const after = () => {
       if (ctx.state !== "running") return;
-      document.querySelectorAll(".fms-alert-popup-sound").forEach((el) => el.classList.add("d-none"));
+      document.querySelectorAll(".fms-alert-toast-sound").forEach((el) => el.classList.add("d-none"));
       if (pendingSoundAt && Date.now() - pendingSoundAt < PENDING_SOUND_MS) playAlarm(pendingUrgent ? "urgent" : "attention");
       pendingSoundAt = 0;
       pendingUrgent = false;
@@ -153,55 +161,125 @@
     }
   }
 
+  function formatClock(iso) {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleTimeString("en-GB", { timeZone: options.timezone || undefined, hour: "2-digit", minute: "2-digit" });
+    } catch (badZone) {
+      return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  /* Stack position: under the topbar, or under the lowest visible [data-fms-toast-anchor] (page
+   * controls in the top-right that must stay clickable) — and, while a dialog is open, under its
+   * header so its close button stays clear. */
+  function placeStack() {
+    if (!container) return;
+    const css = global.getComputedStyle(document.documentElement);
+    const base = (parseFloat(css.getPropertyValue("--fms-topbar-height")) || 64) + 12;
+    const modal = document.querySelector(".modal.show .modal-header");
+    // Phones: page anchors sit mid-screen, so stay under the topbar there.
+    const pageAnchors = global.innerWidth >= 768 ? Array.from(document.querySelectorAll("[data-fms-toast-anchor]")) : [];
+    const anchors = modal ? [modal] : pageAnchors;
+    let top = base;
+    anchors.forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.height && r.bottom > 0 && r.top < global.innerHeight * 0.5) top = Math.max(top, r.bottom + 8);
+    });
+    container.style.top = `${Math.round(top)}px`;
+  }
+  // Dialogs opening / closing move the stack too.
+  document.addEventListener("shown.bs.modal", () => queuePlace());
+  document.addEventListener("hidden.bs.modal", () => queuePlace());
+
+  let placeQueued = false;
+  function queuePlace() {
+    if (placeQueued) return;
+    placeQueued = true;
+    global.requestAnimationFrame(() => { placeQueued = false; placeStack(); });
+  }
+  global.addEventListener("scroll", queuePlace, { passive: true, capture: true });
+  global.addEventListener("resize", queuePlace, { passive: true });
+
   function ensureContainer() {
     if (container && document.body.contains(container)) return container;
     container = document.createElement("div");
     container.className = "fms-alert-stack";
     container.setAttribute("aria-live", "assertive");
+    container.setAttribute("aria-label", "Vehicle alerts");
     document.body.appendChild(container);
     return container;
   }
 
-  function row(label, value) {
-    return value ? `<div class="fms-alert-popup-row"><span>${label}</span><strong>${escapeHtml(value)}</strong></div>` : "";
+  // Level -> accent, from the alert's own severity (the Alert Report's Level).
+  function toneFor(alert) {
+    if (alert.severity === "CRITICAL" || alert.severity === "HIGH") return { cls: "is-high", icon: "bi-exclamation-octagon-fill" };
+    if (alert.severity === "MEDIUM") return { cls: "is-medium", icon: "bi-exclamation-triangle-fill" };
+    return { cls: "is-low", icon: "bi-info-circle-fill" };
   }
 
-  function showPopup(alert, { soundBlocked }) {
-    const location = alert.location
-      || (alert.latitude !== null && alert.latitude !== undefined ? `${alert.latitude.toFixed(5)}, ${alert.longitude.toFixed(5)}` : "");
-    const urgent = isUrgent(alert);
+  function dismiss(card) {
+    if (!card || card.dataset.leaving) return;
+    card.dataset.leaving = "1";
+    global.clearTimeout(card.fmsTimer);
+    card.classList.add("is-leaving");
+    const gone = () => card.remove();
+    card.addEventListener("animationend", gone, { once: true });
+    global.setTimeout(gone, 400); // reduced motion / no animation
+  }
+
+  // Auto-dismiss that pauses while the pointer or keyboard focus is on the toast.
+  function armTimer(card) {
+    let remaining = options.toastDurationMs;
+    let startedAt = 0;
+    const start = () => {
+      if (!remaining || remaining < 0 || card.dataset.leaving) return;
+      startedAt = Date.now();
+      card.fmsTimer = global.setTimeout(() => dismiss(card), remaining);
+    };
+    const pause = () => {
+      global.clearTimeout(card.fmsTimer);
+      remaining = Math.max(1200, remaining - (Date.now() - startedAt));
+    };
+    card.addEventListener("mouseenter", pause);
+    card.addEventListener("mouseleave", start);
+    card.addEventListener("focusin", pause);
+    card.addEventListener("focusout", start);
+    start();
+  }
+
+  function showToast(alert, { soundBlocked }) {
+    const tone = toneFor(alert);
+    const detail = alert.detail || alert.message || "";
+    const time = formatClock(alert.occurred_at);
     const card = document.createElement("div");
-    card.className = `fms-alert-popup${urgent ? "" : " is-medium"}`;
-    card.setAttribute("role", "alertdialog");
-    card.setAttribute("aria-label", `${alert.type_label} alert, vehicle ${alert.vehicle}`);
+    card.className = `fms-alert-toast ${tone.cls}`;
+    card.setAttribute("role", "alert");
     card.innerHTML = `
-      <div class="fms-alert-popup-head">
-        <span class="fms-alert-popup-icon" aria-hidden="true"><i class="bi ${urgent ? "bi-exclamation-octagon-fill" : "bi-exclamation-triangle-fill"}"></i></span>
-        <span class="fms-alert-popup-title">${escapeHtml(alert.type_label)} Alert</span>
-        <button type="button" class="btn-close btn-close-white" aria-label="Dismiss"></button>
+      <span class="fms-alert-toast-icon" aria-hidden="true"><i class="bi ${tone.icon}"></i></span>
+      <div class="fms-alert-toast-body">
+        <div class="fms-alert-toast-head">
+          <a class="fms-alert-toast-title" href="${escapeHtml(alert.link_url || "#")}" title="Open in Alert Report">${escapeHtml(alert.type_label)}</a>
+          <span class="fms-alert-toast-level">${escapeHtml(alert.level_label || "")}</span>
+        </div>
+        <div class="fms-alert-toast-vehicle">${escapeHtml(alert.vehicle || "—")}${time ? `<span class="fms-alert-toast-time">${escapeHtml(time)}</span>` : ""}</div>
+        ${detail ? `<div class="fms-alert-toast-detail">${escapeHtml(detail)}</div>` : ""}
+        <div class="fms-alert-toast-sound${soundBlocked ? "" : " d-none"}"><i class="bi bi-volume-mute" aria-hidden="true"></i>Click anywhere to enable sound</div>
       </div>
-      <div class="fms-alert-popup-body">
-        ${alert.message ? `<p class="fms-alert-popup-message">${escapeHtml(alert.message)}</p>` : ""}
-        ${row("Vehicle", alert.vehicle)}
-        ${row("Level", alert.level_label)}
-        ${row("Driver", alert.driver)}
-        ${row("Time", formatTime(alert.occurred_at))}
-        ${row("Location", location)}
-      </div>
-      <div class="fms-alert-popup-sound${soundBlocked ? "" : " d-none"}">
-        <i class="bi bi-volume-mute me-1" aria-hidden="true"></i>Sound is blocked by the browser — click anywhere to enable it.
-      </div>
-      <div class="fms-alert-popup-actions">
-        <a class="btn btn-sm btn-light fw-semibold" href="${escapeHtml(alert.link_url || "#")}">View alert</a>
-        <button type="button" class="btn btn-sm btn-outline-light" data-dismiss>Dismiss</button>
-      </div>`;
-    const close = () => card.remove();
-    card.querySelector(".btn-close").addEventListener("click", close);
-    card.querySelector("[data-dismiss]").addEventListener("click", close);
-    card.querySelector("a").addEventListener("click", () => {
+      <button type="button" class="fms-alert-toast-close" aria-label="Dismiss notification"><i class="bi bi-x-lg" aria-hidden="true"></i></button>`;
+    card.querySelector(".fms-alert-toast-close").addEventListener("click", () => dismiss(card));
+    card.querySelector(".fms-alert-toast-title").addEventListener("click", () => {
       if (options.onOpen) options.onOpen(alert);
     });
-    ensureContainer().prepend(card);
+    const stack = ensureContainer();
+    // The "enable sound" hint once, on the newest toast only.
+    if (soundBlocked) stack.querySelectorAll(".fms-alert-toast-sound").forEach((el) => el.classList.add("d-none"));
+    stack.prepend(card); // newest on top
+    placeStack();
+    // Never more than maxVisible: the oldest goes (it is still in the bell / Alert Report).
+    const live = Array.from(stack.querySelectorAll(".fms-alert-toast:not(.is-leaving)"));
+    live.slice(Math.max(1, options.maxVisible)).forEach(dismiss);
+    armTimer(card);
   }
 
   /* ---------------- Entry point (called by the bell after each poll) ---------------- */
@@ -216,7 +294,7 @@
     if (!fresh.length) return;
     fresh.forEach((a) => markAnnounced(a.notification_uuid));
     const blocked = !soundReady();
-    fresh.forEach((a) => showPopup(a, { soundBlocked: blocked }));
+    fresh.forEach((a) => showToast(a, { soundBlocked: blocked }));
     // One sound per poll, however many new events arrived in it — the most urgent one's.
     const urgent = fresh.some(isUrgent);
     if (!playAlarm(urgent ? "urgent" : "attention")) {

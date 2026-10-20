@@ -103,8 +103,12 @@ code, kbd, pre {
 .fms-sidebar {
   width: var(--fms-sidebar-width);
   flex-shrink: 0;
-  background: var(--fms-sidebar);
-  border-right: 1px solid var(--fms-border);
+  background:
+    radial-gradient(120% 40% at 0% 100%, rgba(56, 125, 196, 0.22), transparent 70%),
+    linear-gradient(180deg, var(--fms-nav-bg) 0%, var(--fms-nav-bg-deep) 100%);
+  border-right: 1px solid rgba(2, 6, 23, 0.35);
+  box-shadow: 2px 0 14px rgba(2, 6, 23, 0.12);
+  color: var(--fms-nav-text);
   position: fixed;
   inset: 0 auto 0 0;
   z-index: var(--fms-z-sidebar);

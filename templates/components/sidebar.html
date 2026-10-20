@@ -1,10 +1,9 @@
 {% load static %}
+{# Expanded: the full logo. Collapsed (.fms-shell.is-collapsed): the symbol only. #}
 <div class="sidebar-brand">
-  <span class="mark">FMS</span>
-  <span class="brand-text">
-    <div class="brand-title">{{ fms_app_name }}</div>
-    <div class="brand-subtitle">Fleet Management</div>
-  </span>
+  <img class="brand-logo-full" src="{% static 'images/brand/zentora-logo-full.png' %}" alt="" width="541" height="154" decoding="async">
+  <img class="brand-logo-mark" src="{% static 'images/brand/zentora-symbol.png' %}" alt="" width="256" height="256" decoding="async">
+  <span class="visually-hidden">Zentora Info Global Solutions — {{ fms_app_name }}</span>
 </div>
 
 <div class="sidebar-scroll">

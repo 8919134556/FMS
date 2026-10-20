@@ -10,6 +10,10 @@
   const NO_TELEMETRY_URL = root.dataset.noTelemetryUrl;
   const NO_TELEMETRY_COUNT = parseInt(root.dataset.noTelemetryCount, 10) || 0;
   const GEOFENCES_URL = root.dataset.geofencesUrl;
+  // Vehicle immobilizer (Live Map popup): FMS endpoints only — FMS itself talks to the comms command API.
+  const IMMOBILIZER_URL_TEMPLATE = root.dataset.immobilizerUrlTemplate || "";
+  const IMMOBILIZER_COMMAND_URL_TEMPLATE = root.dataset.immobilizerCommandUrlTemplate || "";
+  const CSRF_TOKEN = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || "";
   // Live Map popup: street-level view of ONE vehicle's current position only
   // (no history/route is drawn there — that's the Trip Report's job).
   const LIVE_MAP_ZOOM = 16;
@@ -34,7 +38,6 @@
   // its exact spot instead of the wide fleet view.
   const FOCUS_ZOOM = 17;
 
-  const CONNECTION_TOKEN = { ONLINE: "--fms-success", STALE: "--fms-warning", OFFLINE: "--fms-text-muted" };
 
   // Geofence layer: one fixed colour per geofence TYPE (design-system tokens,
   // the same in the legend) — never random.
@@ -42,6 +45,7 @@
     ENTRY: "--fms-success", EXIT: "--fms-warning", SPEED_LIMIT: "--fms-danger", ENTRY_AND_EXIT: "--fms-purple",
   };
   const GEOFENCE_STORAGE_KEY = "fms.liveTracking.geofences";
+  const GEOFENCE_LEGEND_KEY = "fms.liveTracking.geofenceLegend"; // sessionStorage: this tab only
   // Geofences change rarely; they refresh on their own slow cycle, never with
   // the vehicle feed, and are only redrawn when the data actually changed.
   const GEOFENCE_REFRESH_MS = 30000;
@@ -82,6 +86,9 @@
     geofenceLayer: null,
     geofenceSignature: null,
     geofencesVisible: true,
+    // Immobilizer panel: per-vehicle command state (kept apart from the actual state, which always
+    // comes from the fleet feed) and the single poll timer of the open popup.
+    immo: { entries: new Map(), uuid: null, timer: null, generation: 0 },
   };
 
   function cssVar(name) {
@@ -137,13 +144,6 @@
     return `${km.toLocaleString("en-GB", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
   }
 
-  function initials(name) {
-    if (!name) return "?";
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-
   /* ---------------- Map ---------------- */
 
   function initMap() {
@@ -166,6 +166,9 @@
     state.map = L.map("liveMap", { zoomControl: false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
     L.control.zoom({ position: "bottomleft" }).addTo(state.map);
     FmsMap.addTileLayer(state.map);
+    // Marker detail follows the zoom: compact far out, labels close in.
+    FmsVehicleIcons.applyZoomClass(state.map);
+    state.map.on("zoomend", () => FmsVehicleIcons.applyZoomClass(state.map));
     initGeofences();
   }
 
@@ -251,6 +254,41 @@
     updateGeofenceUi();
   }
 
+  /* Minimize / maximize the geofence legend panel. UI only: geofence shapes, the ON/OFF toggle,
+   * monitoring and alerts are not touched. Remembered for this tab's session. */
+  function setGeofenceLegendCollapsed(collapsed) {
+    const legend = document.getElementById("liveGeofenceLegend");
+    const btn = document.getElementById("liveGeofenceLegendBtn");
+    if (!legend || !btn) return;
+    legend.classList.toggle("is-collapsed", collapsed);
+    const label = collapsed ? "Maximize Geofence Options" : "Minimize Geofence Options";
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    btn.title = label;
+    btn.setAttribute("aria-label", label);
+    btn.querySelector("i").className = `bi ${collapsed ? "bi-plus-lg" : "bi-dash-lg"}`;
+    try {
+      sessionStorage.setItem(GEOFENCE_LEGEND_KEY, collapsed ? "min" : "max");
+    } catch (unavailable) {
+      /* private mode: the state still holds for this page */
+    }
+  }
+
+  function initGeofenceLegendCollapse() {
+    const btn = document.getElementById("liveGeofenceLegendBtn");
+    if (!btn) return;
+    let collapsed = false;
+    try {
+      collapsed = sessionStorage.getItem(GEOFENCE_LEGEND_KEY) === "min";
+    } catch (unavailable) {
+      collapsed = false;
+    }
+    setGeofenceLegendCollapsed(collapsed);
+    btn.addEventListener("click", () => {
+      const legend = document.getElementById("liveGeofenceLegend");
+      setGeofenceLegendCollapsed(!legend.classList.contains("is-collapsed"));
+    });
+  }
+
   function initGeofences() {
     if (!GEOFENCES_URL || !state.map) return;
     try {
@@ -261,6 +299,7 @@
     state.geofenceLayer = L.featureGroup();
     if (state.geofencesVisible) state.geofenceLayer.addTo(state.map);
     document.getElementById("liveGeofenceToggle")?.addEventListener("click", () => setGeofencesVisible(!state.geofencesVisible));
+    initGeofenceLegendCollapse();
     updateGeofenceUi(0);
     loadGeofences();
     // Created / edited / deactivated geofences appear without a page reload.
@@ -269,14 +308,17 @@
     window.addEventListener("pagehide", () => window.clearInterval(timerId));
   }
 
-  function iconFor(vehicle) {
-    const color = cssVar(CONNECTION_TOKEN[vehicle.connection_status] || "--fms-text-muted");
-    const isMoving = vehicle.movement_state === "MOVING";
-    const rotation = isMoving && vehicle.heading !== null && vehicle.heading !== undefined ? vehicle.heading : 0;
-    const isSelected = vehicle.vehicle_uuid === state.selectedUuid;
-    const arrow = isMoving ? '<i class="bi bi-caret-up-fill"></i>' : '<i class="bi bi-record-fill" style="font-size:8px;"></i>';
-    const html = `<div class="fleet-marker-dot${isSelected ? " is-selected" : ""}${vehicle.connection_status === "OFFLINE" ? " is-offline" : ""}" style="background:${color};transform:rotate(${rotation}deg);">${arrow}</div>`;
-    return L.divIcon({ html, className: "fleet-marker-icon", iconSize: [26, 26], iconAnchor: [13, 13] });
+  /* Vehicle markers: static/js/vehicle_icons.js (FmsVehicleIcons) is the one
+   * marker system — type silhouette, status, heading, selection, label and
+   * tooltip — shared with the Live Map popup, the panel and the table.
+   * A marker is built ONCE; afterwards its position glides to each new fix and
+   * only the parts that changed are patched in place. */
+  function addVehicleMarker(map, vehicle, { onClick = null, zIndexOffset = 0 } = {}) {
+    const latlng = [parseFloat(vehicle.latitude), parseFloat(vehicle.longitude)];
+    const marker = L.marker(latlng, { icon: FmsVehicleIcons.markerIcon(vehicle), zIndexOffset, riseOnHover: true });
+    if (onClick) marker.on("click", onClick);
+    marker.addTo(map);
+    return marker;
   }
 
   function renderMarkers(vehicles) {
@@ -287,14 +329,14 @@
       const latlng = [parseFloat(vehicle.latitude), parseFloat(vehicle.longitude)];
       let marker = state.markers.get(vehicle.vehicle_uuid);
       if (!marker) {
-        marker = L.marker(latlng, { icon: iconFor(vehicle) });
-        marker.on("click", () => selectVehicle(vehicle.vehicle_uuid, { recenter: true }));
-        marker.addTo(state.map);
+        marker = addVehicleMarker(state.map, vehicle, {
+          onClick: () => selectVehicle(vehicle.vehicle_uuid, { recenter: true }),
+        });
         state.markers.set(vehicle.vehicle_uuid, marker);
       } else {
-        marker.setLatLng(latlng);
-        marker.setIcon(iconFor(vehicle));
+        FmsVehicleIcons.moveMarker(marker, latlng, { map: state.map });
       }
+      FmsVehicleIcons.updateMarker(marker, vehicle, { selected: vehicle.vehicle_uuid === state.selectedUuid });
     });
     state.markers.forEach((marker, uuid) => {
       if (!seen.has(uuid)) {
@@ -533,7 +575,7 @@
     container.innerHTML = STATUS_PILLS.map((pill) => {
       const isActive = state.filters.statusPill === pill.key;
       return `
-        <button type="button" class="live-status-pill${isActive ? " active" : ""}" data-pill="${pill.key}" role="tab" aria-selected="${isActive}">
+        <button type="button" class="live-status-pill${isActive ? " active" : ""}" data-pill="${pill.key}" data-tone="${(pill.key || "all").toLowerCase()}" role="tab" aria-selected="${isActive}">
           <i class="bi ${pill.icon}"></i>
           <span>${pill.label}</span>
           <span class="live-status-pill-count">${counts[pill.key]}</span>
@@ -589,7 +631,7 @@
     const name = vehicle.driver_name;
     return `
       <div class="d-flex align-items-center gap-2">
-        <span class="avatar-chip" style="width:30px;height:30px;font-size:11px;">${escapeHtml(initials(name))}</span>
+        ${FmsVehicleIcons.badgeHtml(vehicle.vehicle_type, { size: 30 })}
         <div>
           <div class="fw-semibold">${escapeHtml(vehicle.registration_number)}</div>
           <div class="text-small text-muted-fms">${name ? escapeHtml(name) : "Unassigned"}</div>
@@ -730,7 +772,7 @@
 
     document.getElementById("vehiclePanelBody").innerHTML = `
       <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="avatar-chip" style="width:40px;height:40px;font-size:13px;">${escapeHtml(initials(vehicle.driver_name))}</span>
+        ${FmsVehicleIcons.badgeHtml(vehicle.vehicle_type, { size: 40 })}
         <div>
           <div class="fw-semibold" style="font-size:1.05rem;">${escapeHtml(vehicle.registration_number)}</div>
           <div class="text-small text-muted-fms">${vehicle.driver_name ? escapeHtml(vehicle.driver_name) : "Unassigned"}</div>
@@ -739,12 +781,13 @@
       <div class="mb-2">${connectionBadgeHtml(vehicle.connection_status)}</div>
       <p class="text-small text-muted-fms mb-3">Updated ${timeAgo(vehicle.timestamp)}${vehicle.connection_status !== "ONLINE" ? " — data may not reflect the vehicle's current position." : ""}</p>
       <div class="d-flex flex-column gap-2">
+        <div class="d-flex justify-content-between"><span class="cell-secondary">Type</span><span>${escapeHtml(FmsVehicleIcons.labelFor(vehicle.vehicle_type))}</span></div>
         <div class="d-flex justify-content-between gap-3"><span class="cell-secondary">Location</span><span class="text-end">${vehicle.location ? escapeHtml(vehicle.location) : "—"}</span></div>
         <div class="d-flex justify-content-between"><span class="cell-secondary">Track Time</span><span>${escapeHtml(trackTime(vehicle.timestamp))}</span></div>
         <div class="d-flex justify-content-between"><span class="cell-secondary">GPS Odometer</span><span>${escapeHtml(gpsOdometerText(vehicle))}</span></div>
         <div class="d-flex justify-content-between"><span class="cell-secondary">Coordinates</span><span>${parseFloat(vehicle.latitude).toFixed(5)}, ${parseFloat(vehicle.longitude).toFixed(5)}</span></div>
         <div class="d-flex justify-content-between"><span class="cell-secondary">Speed</span><span>${vehicle.speed !== null ? vehicle.speed + " km/h" : "—"}</span></div>
-        <div class="d-flex justify-content-between"><span class="cell-secondary">Heading</span><span>${vehicle.heading !== null ? vehicle.heading + "°" : "—"}</span></div>
+        <div class="d-flex justify-content-between align-items-center"><span class="cell-secondary">Direction</span><span>${directionHtml(vehicle)}</span></div>
         <div class="d-flex justify-content-between"><span class="cell-secondary">Ignition</span><span>${ignitionHtml(vehicle.ignition)}</span></div>
         ${vehicle.movement_state ? `<div class="d-flex justify-content-between"><span class="cell-secondary">Movement</span><span>${vehicle.movement_state}</span></div>` : ""}
         <div class="d-flex justify-content-between"><span class="cell-secondary">Odometer</span><span>${vehicle.odometer !== null ? vehicle.odometer : "—"}</span></div>
@@ -763,15 +806,39 @@
 
   /* ---------------- Live Map popup (one vehicle) ---------------- */
 
+  // Direction cell: compass + "North-East · 45°" (moving) / "Stationary · last heading NE" / unknown.
+  function directionHtml(vehicle) {
+    const d = FmsVehicleIcons.directionOf(vehicle);
+    let text;
+    let sub = "";
+    if (d.degrees === null) {
+      text = d.moving ? "Calculating…" : "Stationary";
+      sub = d.moving ? "Waiting for enough movement" : "No recent movement";
+    } else if (d.moving) {
+      text = `${d.label} · ${d.degrees}°`;
+      sub = d.source === "device" ? "From the device heading" : "From the GPS track";
+    } else {
+      text = "Stationary";
+      sub = `Last heading ${d.label} · ${d.degrees}°`;
+    }
+    return `<span class="live-direction">${FmsVehicleIcons.compassHtml(vehicle)}
+      <span class="live-direction-text"><span class="live-direction-main">${escapeHtml(text)}</span><span class="live-direction-sub">${escapeHtml(sub)}</span></span></span>`;
+  }
+
   function liveMapDetailsHtml(vehicle) {
     const row = (label, value) =>
       `<div class="live-vehicle-row"><span class="cell-secondary">${label}</span><span>${value}</span></div>`;
     return `
       <div class="live-vehicle-status">
         ${connectionBadgeHtml(vehicle.connection_status)}
-        ${vehicle.movement_state ? `<span class="text-small text-muted-fms">${escapeHtml(vehicle.movement_state.toLowerCase())}</span>` : ""}
+        <span class="text-small text-muted-fms">${escapeHtml(FmsVehicleIcons.statusFor(vehicle).label.toLowerCase())}</span>
       </div>
+      <section class="live-immobilizer" id="liveImmobilizer" aria-label="Vehicle immobilizer"></section>
+      ${row("Vehicle", `<strong>${escapeHtml(vehicle.registration_number)}</strong>`)}
+      ${row("Type", `<span class="d-inline-flex align-items-center gap-1">${FmsVehicleIcons.badgeHtml(vehicle.vehicle_type, { size: 24 })}${escapeHtml(FmsVehicleIcons.labelFor(vehicle.vehicle_type))}</span>`)}
       ${row("Driver", vehicle.driver_name ? escapeHtml(vehicle.driver_name) : '<span class="text-muted-fms">Unassigned</span>')}
+      ${row("Status", (() => { const st = FmsVehicleIcons.statusFor(vehicle); return `<span class="vm-status-text vm-status-text--${st.key}"><span class="dot"></span>${st.label}</span>`; })())}
+      ${vehicle.active_alert ? row("Active alert", `<span class="vm-status-text vm-status-text--alert"><i class="bi bi-exclamation-triangle-fill"></i>${escapeHtml(vehicle.active_alert.label)}</span>`) : ""}
       ${row("Location", vehicle.location ? escapeHtml(vehicle.location) : '<span class="text-muted-fms">—</span>')}
       ${row("Speed", vehicle.speed !== null && vehicle.speed !== undefined ? `${escapeHtml(vehicle.speed)} km/h` : "—")}
       ${row("Odometer", escapeHtml(deviceOdometerText(vehicle)))}
@@ -779,13 +846,15 @@
       ${row("Ignition", ignitionHtml(vehicle.ignition))}
       ${row("Last update", `${escapeHtml(trackTime(vehicle.timestamp))}<div class="cell-secondary">${escapeHtml(timeAgo(vehicle.timestamp))}</div>`)}
       ${row("Coordinates", `${parseFloat(vehicle.latitude).toFixed(5)}, ${parseFloat(vehicle.longitude).toFixed(5)}`)}
-      ${vehicle.heading !== null && vehicle.heading !== undefined ? row("Heading", `${escapeHtml(vehicle.heading)}°`) : ""}
+      ${row("Direction", directionHtml(vehicle))}
       ${vehicle.connection_status !== "ONLINE"
         ? '<p class="text-small text-muted-fms mb-0 mt-2"><i class="bi bi-info-circle me-1"></i>This is the last reported position — the vehicle is not reporting live right now.</p>'
         : ""}`;
   }
 
   function renderLiveMapHeader(vehicle) {
+    const headerIcon = document.getElementById("liveVehicleModalIcon");
+    if (headerIcon) headerIcon.innerHTML = FmsVehicleIcons.svg(vehicle.vehicle_type, 30);
     document.getElementById("liveVehicleModalTitle").textContent = `${vehicle.registration_number} — Live Map`;
     document.getElementById("liveVehicleModalSubtitle").textContent = vehicle.driver_name || "Unassigned";
     document.getElementById("liveVehicleModalUpdated").textContent = `Updated ${timeAgo(vehicle.timestamp)} · refreshes with the page`;
@@ -796,8 +865,9 @@
     if (!vehicle) return;
     const modalEl = document.getElementById("liveVehicleModal");
     state.liveMap.uuid = uuid;
+    immoOpen(uuid);
     renderLiveMapHeader(vehicle);
-    document.getElementById("liveVehicleDetails").innerHTML = liveMapDetailsHtml(vehicle);
+    setLiveDetails(vehicle);
     if (modalEl.classList.contains("show")) {
       buildLiveMap(); // already open: "shown" won't fire again, rebuild for this vehicle now
       return;
@@ -848,8 +918,11 @@
     }
     const latlng = [parseFloat(vehicle.latitude), parseFloat(vehicle.longitude)];
     map.setView(latlng, LIVE_MAP_ZOOM);
-    // Same status marker as the main map — this vehicle only, at its latest position.
-    state.liveMap.marker = L.marker(latlng, { icon: iconFor(vehicle), zIndexOffset: 1000 }).addTo(map);
+    // The same vehicle marker as the main map — this vehicle only, labelled (street-level zoom).
+    FmsVehicleIcons.applyZoomClass(map);
+    map.on("zoomend", () => FmsVehicleIcons.applyZoomClass(map));
+    state.liveMap.marker = addVehicleMarker(map, vehicle, { zIndexOffset: 1000 });
+    FmsVehicleIcons.updateMarker(state.liveMap.marker, vehicle, { selected: true });
   }
 
   // Called after every fleet refresh (the page's own feed) while the popup is open.
@@ -866,19 +939,19 @@
       return;
     }
     renderLiveMapHeader(vehicle);
-    details.innerHTML = liveMapDetailsHtml(vehicle);
+    setLiveDetails(vehicle);
     const { map } = state.liveMap;
     if (!map || !hasGpsFix(vehicle)) return; // keep showing the last good position
     const latlng = L.latLng(parseFloat(vehicle.latitude), parseFloat(vehicle.longitude));
     if (!state.liveMap.marker) {
       // First fix arrived while the popup was open.
       setLiveMapNotice("");
-      state.liveMap.marker = L.marker(latlng, { icon: iconFor(vehicle), zIndexOffset: 1000 }).addTo(map);
+      state.liveMap.marker = addVehicleMarker(map, vehicle, { zIndexOffset: 1000 });
       map.setView(latlng, LIVE_MAP_ZOOM);
     } else {
-      state.liveMap.marker.setLatLng(latlng); // old location -> new location
-      state.liveMap.marker.setIcon(iconFor(vehicle));
+      FmsVehicleIcons.moveMarker(state.liveMap.marker, latlng, { map }); // glide old -> new location
     }
+    FmsVehicleIcons.updateMarker(state.liveMap.marker, vehicle, { selected: true });
     if (vehicle.timestamp !== state.liveMap.lastTimestamp) {
       state.liveMap.lastTimestamp = vehicle.timestamp;
       // Keep the moving vehicle in view without fighting the user's zoom.
@@ -892,8 +965,402 @@
     modalEl.addEventListener("shown.bs.modal", buildLiveMap);
     modalEl.addEventListener("hidden.bs.modal", () => {
       destroyLiveMap();
+      immoClose();
       state.liveMap.uuid = null;
     });
+    // The immobilizer panel is re-rendered with the details: one delegated listener.
+    document.getElementById("liveVehicleDetails").addEventListener("click", onImmobilizerClick);
+  }
+
+  /* ---------------- Vehicle immobilizer (Live Map popup) ----------------
+   * Two separate things, never mixed:
+   *   ACTUAL state   = vehicle.immobilizer from the fleet feed (the device data / comms current_table:
+   *                    true = ON, false = OFF, null = unknown) — the marker uses the same value;
+   *   COMMAND status = entry.info.command, from FMS (which asks the comms command API):
+   *                    0 Pending, 1 Processing, 2 Sent to device, 3 Failed, 4 Completed.
+   * Sending or completing a command never changes the displayed actual state. */
+
+  const IMMO_TERMINAL = new Set([3, 4]);
+  const IMMO_CONFIRM_WATCH_MS = 60000; // after Completed: refresh the feed until the device reports the new state
+  const IMMO_CONFIRM_EVERY_MS = 5000;
+
+  function immoEntry(uuid) {
+    if (!state.immo.entries.has(uuid)) {
+      state.immo.entries.set(uuid, {
+        info: null, loading: false, loadError: "", submitting: false, confirming: null, message: null, polling: false, watchUntil: 0,
+      });
+    }
+    return state.immo.entries.get(uuid);
+  }
+
+  function immoUrl(template, uuid) {
+    return template.replace(ZERO_UUID, uuid);
+  }
+
+  function immoStopTimer() {
+    if (state.immo.timer) window.clearTimeout(state.immo.timer);
+    state.immo.timer = null;
+  }
+
+  // Popup closed or another vehicle opened: stop every timer; a late reply is dropped by the generation check.
+  function immoClose() {
+    immoStopTimer();
+    state.immo.generation += 1;
+    const entry = state.immo.uuid && state.immo.entries.get(state.immo.uuid);
+    if (entry) Object.assign(entry, { polling: false, confirming: null, watchUntil: 0 });
+    state.immo.uuid = null;
+  }
+
+  function immoOpen(uuid) {
+    immoClose();
+    if (!IMMOBILIZER_URL_TEMPLATE) return;
+    state.immo.uuid = uuid;
+    const generation = state.immo.generation;
+    const entry = immoEntry(uuid);
+    entry.message = null;
+    entry.loading = !entry.info;
+    entry.loadError = "";
+    renderImmobilizer();
+    fetch(immoUrl(IMMOBILIZER_URL_TEMPLATE, uuid), { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((body) => {
+        if (generation !== state.immo.generation) return; // closed / switched meanwhile
+        entry.info = body;
+        entry.loading = false;
+        if (body.command && body.command.in_progress) immoSchedulePoll(uuid);
+        renderImmobilizer();
+      })
+      .catch(() => {
+        if (generation !== state.immo.generation) return;
+        entry.loading = false;
+        entry.loadError = "Could not load the immobilizer status.";
+        renderImmobilizer();
+      });
+  }
+
+  function immoSchedulePoll(uuid) {
+    immoStopTimer();
+    const entry = immoEntry(uuid);
+    entry.polling = true;
+    const intervalMs = Math.max(1, (entry.info && entry.info.poll_interval_seconds) || 2) * 1000;
+    state.immo.timer = window.setTimeout(() => immoPollOnce(uuid), intervalMs);
+  }
+
+  // One status request at a time: the next one is scheduled only after this one has ended.
+  function immoPollOnce(uuid) {
+    state.immo.timer = null;
+    const entry = immoEntry(uuid);
+    const command = entry.info && entry.info.command;
+    if (state.immo.uuid !== uuid || !command) return;
+    const generation = state.immo.generation;
+    const token = command.uuid;
+    const deadline = new Date(command.created_at).getTime() + (command.timeout_seconds + 15) * 1000;
+    fetch(immoUrl(IMMOBILIZER_COMMAND_URL_TEMPLATE, token), { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((body) => {
+        // Only the command this popup is tracking, for this vehicle, may change the panel.
+        if (generation !== state.immo.generation || state.immo.uuid !== uuid) return;
+        if (!entry.info.command || entry.info.command.uuid !== token || !body.command || body.command.uuid !== token) return;
+        entry.info.command = body.command;
+        entry.message = body.warning ? { tone: "warning", text: `${body.warning} Retrying…` } : null;
+        immoAfterUpdate(uuid);
+      })
+      .catch(() => {
+        if (generation !== state.immo.generation || state.immo.uuid !== uuid) return;
+        if (Date.now() < deadline) {
+          entry.message = { tone: "warning", text: "Connection problem while checking the command — retrying…" };
+          immoSchedulePoll(uuid);
+        } else {
+          entry.polling = false;
+          entry.message = { tone: "danger", text: "Stopped checking: no answer in time. Reopen the map to check again." };
+        }
+        renderImmobilizer();
+      });
+  }
+
+  function immoAfterUpdate(uuid) {
+    const entry = immoEntry(uuid);
+    const command = entry.info.command;
+    if (command.in_progress) {
+      immoSchedulePoll(uuid);
+    } else {
+      entry.polling = false;
+      immoStopTimer();
+      if (command.status === 4) {
+        // Completed is not proof: refresh the feed until the device data reports the requested state.
+        entry.watchUntil = Date.now() + IMMO_CONFIRM_WATCH_MS;
+        immoConfirmWatch(uuid);
+      }
+    }
+    renderImmobilizer();
+  }
+
+  function immoActual(uuid) {
+    const vehicle = state.vehicles.get(uuid);
+    return vehicle && typeof vehicle.immobilizer === "boolean" ? vehicle.immobilizer : null;
+  }
+
+  function immoConfirmWatch(uuid) {
+    state.immo.timer = null;
+    const entry = immoEntry(uuid);
+    const command = entry.info && entry.info.command;
+    if (state.immo.uuid !== uuid || !command) return;
+    if (immoActual(uuid) === (command.requested_state === "on") || Date.now() > entry.watchUntil) {
+      entry.watchUntil = 0;
+      renderImmobilizer();
+      return;
+    }
+    state.refresher.refreshNow(); // the page's own feed: updates the actual state, marker and table together
+    state.immo.timer = window.setTimeout(() => immoConfirmWatch(uuid), IMMO_CONFIRM_EVERY_MS);
+  }
+
+  function immoSubmit(uuid, wanted) {
+    const entry = immoEntry(uuid);
+    if (entry.submitting || (entry.info && entry.info.command && entry.info.command.in_progress)) return; // no duplicates
+    entry.submitting = true;
+    entry.sendingState = wanted;
+    entry.confirming = null;
+    entry.message = null;
+    renderImmobilizer();
+    const generation = state.immo.generation;
+    fetch(immoUrl(IMMOBILIZER_URL_TEMPLATE, uuid), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRFToken": CSRF_TOKEN },
+      body: JSON.stringify({ state: wanted }),
+    })
+      .then((res) => res.json().catch(() => ({})).then((body) => ({ ok: res.ok, status: res.status, body })))
+      .then(({ ok, status, body }) => {
+        entry.submitting = false;
+        if (body && body.vehicle_uuid === uuid) entry.info = body;
+        if (generation !== state.immo.generation || state.immo.uuid !== uuid) return;
+        if (ok && body.command) {
+          entry.message = null; // the step tracker shows the progress
+          immoSchedulePoll(uuid);
+        } else {
+          const fallback = status === 403 ? "You don't have permission to send commands." : "The command could not be sent.";
+          entry.message = { tone: "danger", text: `${(body && body.detail) || fallback} The immobilizer state is unchanged.` };
+          if (body && body.command && body.command.in_progress) immoSchedulePoll(uuid);
+        }
+        renderImmobilizer();
+      })
+      .catch(() => {
+        entry.submitting = false;
+        if (generation !== state.immo.generation || state.immo.uuid !== uuid) return;
+        entry.message = { tone: "danger", text: "Network error — the command was not confirmed as sent. Reopen the map to check its status." };
+        renderImmobilizer();
+      });
+  }
+
+  function onImmobilizerClick(event) {
+    const button = event.target.closest("[data-immo]");
+    const uuid = state.immo.uuid;
+    if (!button || !uuid || button.disabled) return;
+    const entry = immoEntry(uuid);
+    const action = button.dataset.immo;
+    if (action === "on" || action === "off") entry.confirming = action;
+    else if (action === "cancel") entry.confirming = null;
+    else if (action === "confirm" && entry.confirming) {
+      immoSubmit(uuid, entry.confirming);
+      return;
+    }
+    renderImmobilizer();
+  }
+
+  /* ---- Panel rendering ----
+   * The ACTUAL state is the card's header (from the fleet feed: the device data); the COMMAND
+   * status is a separate step tracker underneath. They never borrow each other's labels. */
+
+  const IMMO_STEPS = ["Pending", "Processing", "Sent to device", "Completed"];
+
+  // Where a command is on the tracker: { done: n steps done, active, final: success|failed|timeout|rejected|null }
+  function immoProgress(command, sending) {
+    if (sending) return { done: 0, active: 0, final: null, sending: true };
+    if (command.status === null) return { done: 0, active: -1, final: command.in_progress ? null : "rejected" };
+    if (command.status === 4) return { done: 4, active: -1, final: "success" };
+    if (command.status === 3) return { done: 3, active: -1, final: "failed" };
+    if (command.timed_out) return { done: command.status + 1, active: -1, final: "timeout" };
+    return { done: command.status, active: command.status, final: null };
+  }
+
+  function immoStepsHtml(progress) {
+    return `<ol class="immo-steps" aria-label="Command progress">${IMMO_STEPS.map((label, i) => {
+      let cls = "todo";
+      let text = label;
+      if (i < progress.done) cls = "done";
+      if (i === progress.active) cls = "active";
+      if (i === 3 && progress.final === "failed") { cls = "failed"; text = "Failed"; }
+      if (i === 3 && progress.final === "timeout") { cls = "timeout"; text = "Timed out"; }
+      if (i === 0 && progress.final === "rejected") { cls = "failed"; text = "Not accepted"; }
+      const icon = { done: "bi-check-lg", failed: "bi-x-lg", timeout: "bi-clock" }[cls] || "";
+      return `<li class="immo-step is-${cls}"${cls === "active" ? ' aria-current="step"' : ""}>
+          <span class="immo-step-dot">${icon ? `<i class="bi ${icon}" aria-hidden="true"></i>` : ""}</span>
+          <span class="immo-step-label">${escapeHtml(text)}</span></li>`;
+    }).join("")}</ol>`;
+  }
+
+  function immoCanSend(info) {
+    return !!(info && info.can_command && info.service_configured && info.has_unit_no);
+  }
+
+  function immoActionButton(wanted, busy) {
+    const enable = wanted === "on";
+    const label = enable ? "Enable immobilizer" : "Disable immobilizer";
+    const inner = busy
+      ? '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Processing…</span>'
+      : `<i class="bi ${enable ? "bi-lock-fill" : "bi-unlock-fill"}" aria-hidden="true"></i><span>${label}</span>`;
+    return `<button type="button" class="immo-action immo-action--${enable ? "enable" : "disable"}" data-immo="${wanted}"
+      aria-label="${label}"${busy ? ' disabled aria-busy="true"' : ""}>${inner}</button>`;
+  }
+
+  function immobilizerHtml(vehicle) {
+    if (!IMMOBILIZER_URL_TEMPLATE) return "";
+    const entry = immoEntry(vehicle.vehicle_uuid);
+    const info = entry.info;
+    const actual = typeof vehicle.immobilizer === "boolean" ? vehicle.immobilizer : null;
+    const command = info && info.command;
+    const sending = entry.submitting;
+    const busy = sending || !!(command && command.in_progress);
+    const stateKey = actual === null ? "unknown" : actual ? "on" : "off";
+
+    // Header: the ACTUAL state.
+    const hero = {
+      on: { icon: "bi-shield-lock-fill", title: "IMMOBILIZER ON", sub: "Engaged — reported by the vehicle" },
+      off: { icon: "bi-shield-check", title: "IMMOBILIZER OFF", sub: "Not engaged — reported by the vehicle" },
+      unknown: { icon: "bi-shield", title: "STATE UNKNOWN", sub: "The vehicle has not reported its immobilizer yet" },
+    }[stateKey];
+
+    // Body: the control.
+    let body = "";
+    if (entry.loading) {
+      body = '<div class="immo-skeleton" aria-label="Loading"><span></span></div>';
+    } else if (entry.loadError) {
+      body = `<div class="immo-note immo-note--danger"><i class="bi bi-wifi-off" aria-hidden="true"></i>${escapeHtml(entry.loadError)}</div>`;
+    } else if (info && !info.can_command) {
+      body = '<div class="immo-note"><i class="bi bi-eye" aria-hidden="true"></i>View only — you can\'t send immobilizer commands.</div>';
+    } else if (info && !info.service_configured) {
+      body = '<div class="immo-note"><i class="bi bi-plug" aria-hidden="true"></i>The command service is not configured.</div>';
+    } else if (info && !info.has_unit_no) {
+      body = '<div class="immo-note"><i class="bi bi-cpu" aria-hidden="true"></i>No GPS device unit number — commands are unavailable.</div>';
+    } else if (info && entry.confirming && !busy) {
+      const enable = entry.confirming === "on";
+      const moving = vehicle.movement_state === "MOVING";
+      const speed = vehicle.speed !== null && vehicle.speed !== undefined ? ` at ${Math.round(Number(vehicle.speed))} km/h` : "";
+      body = `
+        <div class="immo-confirm" role="group" aria-label="Confirm immobilizer command">
+          <div class="immo-confirm-title"><i class="bi ${enable ? "bi-lock-fill" : "bi-unlock-fill"}" aria-hidden="true"></i>${enable ? "Enable" : "Disable"} immobilizer?</div>
+          <p class="immo-confirm-text">An immobilizer <strong>${enable ? "ON" : "OFF"}</strong> command will be sent to <strong>${escapeHtml(vehicle.registration_number)}</strong>.</p>
+          ${enable && moving ? `<div class="immo-warn"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>This vehicle is moving${speed}.</div>` : ""}
+          <div class="immo-confirm-actions">
+            <button type="button" class="immo-btn-ghost" data-immo="cancel">Cancel</button>
+            <button type="button" class="immo-action immo-action--${enable ? "enable" : "disable"} immo-action--sm" data-immo="confirm">
+              <i class="bi bi-check2" aria-hidden="true"></i><span>${enable ? "Enable" : "Disable"}</span></button>
+          </div>
+        </div>`;
+    } else if (info) {
+      const options = actual === null ? ["on", "off"] : [actual ? "off" : "on"]; // both while unknown
+      body = `<div class="immo-actions${options.length > 1 ? " immo-actions--pair" : ""}">${options.map((w) => immoActionButton(w, busy)).join("")}</div>`;
+    }
+
+    // Footer: the COMMAND (last one, or the one being sent).
+    let commandHtml = "";
+    if (command || sending) {
+      const requested = sending ? entry.sendingState : command.requested_state;
+      const progress = sending ? immoProgress(null, true) : immoProgress(command, false);
+      const meta = [];
+      if (!sending) {
+        if (command.command_id !== null && command.command_id !== undefined) meta.push(`#${command.command_id}`);
+        meta.push(trackTime(command.created_at));
+        if (command.requested_by) meta.push(command.requested_by);
+      }
+      const word = requested === "on" ? "ON" : "OFF";
+      const reached = actual === (requested === "on");
+      let tone = "progress";
+      let icon = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
+      let text = "";
+      let retry = false;
+      if (progress.sending) text = "Sending command…";
+      else if (progress.final === "success" && reached) {
+        tone = "success"; icon = '<i class="bi bi-check-circle-fill immo-pop" aria-hidden="true"></i>';
+        text = `Done — the vehicle reports IMMOBILIZER ${word}.`;
+      } else if (progress.final === "success") {
+        tone = "info";
+        if (!entry.watchUntil) icon = '<i class="bi bi-hourglass-split" aria-hidden="true"></i>';
+        text = `Command completed. Waiting for the vehicle to report ${word}…`;
+      } else if (progress.final === "failed") {
+        tone = "danger"; icon = '<i class="bi bi-x-octagon-fill immo-pop" aria-hidden="true"></i>';
+        text = `The device did not carry out the command. The immobilizer is ${actual === null ? "unchanged" : `still ${actual ? "ON" : "OFF"}`}.`;
+        retry = true;
+      } else if (progress.final === "timeout") {
+        tone = "warning"; icon = '<i class="bi bi-clock-history" aria-hidden="true"></i>';
+        text = "No final response in time. The vehicle data will still show any change.";
+        retry = true;
+      } else if (progress.final === "rejected") {
+        tone = "danger"; icon = '<i class="bi bi-exclamation-octagon-fill immo-pop" aria-hidden="true"></i>';
+        text = `${command.error || "The command was not accepted."} The immobilizer is unchanged.`;
+        retry = true;
+      } else if (command.status === 2) text = "Waiting for device response…";
+      else text = "Waiting for the command service…";
+      retry = retry && !reached && immoCanSend(info) && !busy;
+      // Connection hiccups while checking (only while it still runs), or "stopped checking".
+      const showNotice = entry.message && !sending
+        && ((entry.message.tone === "warning" && command.in_progress) || (entry.message.tone === "danger" && command.in_progress));
+      const notice = showNotice
+        ? `<div class="immo-notice immo-notice--${entry.message.tone}"><i class="bi ${entry.message.tone === "danger" ? "bi-wifi-off" : "bi-arrow-repeat"}" aria-hidden="true"></i>${escapeHtml(entry.message.text)}</div>` : "";
+      commandHtml = `
+        <div class="immo-command${progress.final ? ` is-${progress.final}` : " is-running"}">
+          <div class="immo-command-head">
+            <span class="immo-command-title">Command · Turn ${word}</span>
+            <span class="immo-command-meta">${escapeHtml(meta.join(" · "))}</span>
+          </div>
+          ${immoStepsHtml(progress)}
+          <div class="immo-feedback immo-feedback--${tone}" role="status">${icon}<span>${escapeHtml(text)}</span>
+            ${retry ? `<button type="button" class="immo-retry" data-immo="${requested}"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i>Retry</button>` : ""}
+          </div>
+          ${notice}
+        </div>`;
+    } else if (entry.message && entry.message.tone === "danger") {
+      commandHtml = `<div class="immo-feedback immo-feedback--danger" role="status"><i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i><span>${escapeHtml(entry.message.text)}</span></div>`;
+    }
+
+    return `
+      <div class="immo-card immo-card--${stateKey}${busy ? " is-busy" : ""}">
+        <div class="immo-busy-bar" aria-hidden="true"></div>
+        <div class="immo-hero">
+          <span class="immo-hero-icon"><i class="bi ${hero.icon}" aria-hidden="true"></i></span>
+          <div class="immo-hero-text">
+            <span class="immo-eyebrow">Vehicle immobilizer · actual state</span>
+            <span class="immo-hero-state">${hero.title}</span>
+            <span class="immo-hero-sub">${hero.sub}</span>
+          </div>
+        </div>
+        <div class="immo-body">${body}</div>
+        ${commandHtml}
+      </div>`;
+  }
+
+  // Draws the panel only when its content changed, so live refreshes never restart its animations
+  // or steal focus (the panel node itself survives detail re-renders — see setLiveDetails).
+  function renderImmobilizer() {
+    const panel = document.getElementById("liveImmobilizer");
+    const vehicle = state.immo.uuid && state.vehicles.get(state.immo.uuid);
+    if (!panel || !vehicle) return;
+    const html = immobilizerHtml(vehicle);
+    if (panel.fmsHtml === html) return;
+    const focused = document.activeElement && panel.contains(document.activeElement) ? document.activeElement.dataset.immo : null;
+    panel.innerHTML = html;
+    panel.fmsHtml = html;
+    panel.dataset.uuid = vehicle.vehicle_uuid;
+    if (focused) panel.querySelector(`[data-immo="${focused}"]`)?.focus();
+  }
+
+  // Popup details: rebuilt on each refresh, but the immobilizer panel node is carried over.
+  function setLiveDetails(vehicle) {
+    const details = document.getElementById("liveVehicleDetails");
+    const kept = details.querySelector("#liveImmobilizer");
+    details.innerHTML = liveMapDetailsHtml(vehicle);
+    const slot = details.querySelector("#liveImmobilizer");
+    if (kept && slot && kept.dataset.uuid === vehicle.vehicle_uuid) slot.replaceWith(kept);
+    renderImmobilizer();
   }
 
   /* ---------------- Controls ---------------- */
@@ -937,6 +1404,9 @@
       defaultMs: DEFAULT_REFRESH_MS,
       onStateChange: onRefreshState,
     });
+    // A new alert announced by the bell (static/js/alert_center.js) -> fetch now, so its pin turns red
+    // without waiting for the next interval.
+    window.addEventListener("fms:alert", () => state.refresher.refreshNow());
 
     // "Updated N sec ago" is a pure clock read — no network involved.
     state.tickTimerId = window.setInterval(tickLastUpdated, 5000);

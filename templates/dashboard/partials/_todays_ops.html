@@ -1,6 +1,7 @@
 {% load fms_extras %}
   {% comment %}============ Section 2: Today's Operations ============{% endcomment %}
-  {% if can_view_trip %}
+  {# Dispatch-trip statuses (Trips module): shown only when there are dispatch trips in the period. #}
+  {% if can_view_trip and trip_status_summary.total or can_view_trip and trip_status_summary_error %}
     <div class="card-fms mt-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>

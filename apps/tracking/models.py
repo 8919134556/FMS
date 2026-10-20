@@ -190,6 +190,16 @@ class VehicleCurrentTelemetry(TimeStampedModel):
         max_digits=6, decimal_places=3, null=True, blank=True,
         help_text="Main (external) power voltage in V (comms mainpower = externalvoltage / 1000); 0 = disconnected.",
     )
+    vehicle_type = models.CharField(
+        max_length=60, blank=True, default="",
+        help_text="Vehicle type as the comms current_table reports it (vechile_type), as stored there; picks the "
+        "Live Tracking icon. Empty = use the FMS Vehicle Type.",
+    )
+    immobilizer = models.BooleanField(
+        null=True, blank=True,
+        help_text="ACTUAL immobilizer state from the comms current_table (column spelled 'immobalizer'): "
+        "1 = ON (True), 0 = OFF (False), unknown = empty. Only the device data sets it — never a command.",
+    )
 
     class Meta:
         verbose_name_plural = "Vehicle current telemetry"
@@ -310,3 +320,62 @@ class DeviceCommand(UUIDModel, TimeStampedModel):
 
     def __str__(self):
         return f"DeviceCommand({self.command_type}, device={self.device_id}, status={self.status})"
+
+
+class ImmobilizerCommand(UUIDModel, TimeStampedModel):
+    """An immobilizer ON/OFF command sent through the Zentora comms command API
+    (apps.tracking.immobilizer) — the COMMAND's progress only.
+
+    Deliberately not a DeviceCommand: those are delivered by FMS's own
+    telematics TCP service, whose dispatcher sends every PENDING row and
+    re-queues unacknowledged ones. A comms-API command stored there could reach
+    the vehicle twice. This table is never read by that dispatcher.
+
+    The vehicle's ACTUAL immobilizer state is VehicleCurrentTelemetry.immobilizer
+    (from the device data); nothing here ever writes it."""
+
+    class State(models.TextChoices):
+        ON = "on", "On"
+        OFF = "off", "Off"
+
+    # The comms API's numeric command status (GET /commands/{id} -> "status").
+    class Status(models.IntegerChoices):
+        PENDING = 0, "Pending"
+        PROCESSING = 1, "Processing"
+        SENT = 2, "Sent to device"
+        FAILED = 3, "Failed"
+        COMPLETED = 4, "Completed"
+
+    TERMINAL_STATUSES = (Status.FAILED, Status.COMPLETED)
+
+    vehicle = models.ForeignKey("vehicles.Vehicle", on_delete=models.PROTECT, related_name="immobilizer_commands")
+    device = models.ForeignKey(TrackingDevice, null=True, on_delete=models.SET_NULL, related_name="+")
+    unit_no = models.CharField(max_length=20, help_text="The device unit number the command was sent to (IMEI).")
+    requested_state = models.CharField(max_length=3, choices=State.choices)
+    command_id = models.PositiveBigIntegerField(
+        null=True, blank=True, db_index=True, help_text="The comms API's command_id (empty if it never accepted it)."
+    )
+    status = models.SmallIntegerField(
+        choices=Status.choices, null=True, blank=True, help_text="Last command status reported by the comms API."
+    )
+    status_name = models.CharField(max_length=40, blank=True, default="")
+    error = models.CharField(max_length=255, blank=True, default="")
+    timed_out = models.BooleanField(default=False)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(
+        null=True, blank=True, help_text="Set once the command is no longer in progress (failed/completed/timed out/rejected)."
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["vehicle", "-created_at"])]
+
+    @property
+    def in_progress(self):
+        return self.finished_at is None
+
+    def __str__(self):
+        return f"Immobilizer {self.requested_state} -> {self.unit_no} (#{self.command_id}, {self.get_status_display()})"

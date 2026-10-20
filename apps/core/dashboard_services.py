@@ -474,3 +474,282 @@ class DashboardService(_ClientScoped):
             total.append(by_day.get(day, {}).get("total", 0))
             completed.append(by_day.get(day, {}).get("completed", 0))
         return {"labels": labels, "total": total, "completed": completed}
+
+
+# ---------------------------------------------------------------------------
+# Live fleet + alerts (telemetry-driven). Each function checks its own module
+# permission and returns None when the caller can't see it; data comes from the
+# same services the Live Tracking page, Trip Report and Alert Report use, so
+# the dashboard can never disagree with them.
+# ---------------------------------------------------------------------------
+
+LIVE_STATUS_KEYS = ("moving", "idle", "stopped", "offline")
+LIVE_STATUS_LABELS = {"moving": "Moving", "idle": "Idle", "stopped": "Ignition Off", "offline": "Offline"}
+ALERT_LEVELS = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
+RECENT_ALERTS_LIMIT = 6
+RECENT_TRIPS_LIMIT = 5
+ACTIVITY_FEED_LIMIT = 8
+
+
+def live_status_key(vehicle):
+    """Same rule as the Live Tracking marker (static/js/vehicle_icons.js statusFor)."""
+    if vehicle.get("connection_status") == "OFFLINE":
+        return "offline"
+    if vehicle.get("movement_state") == "MOVING":
+        return "moving"
+    if vehicle.get("ignition") is False:
+        return "stopped"
+    return "idle"
+
+
+def live_fleet_summary(user):
+    """Counts by live status from the fleet feed (apps.tracking.services.fleet_current_telemetry)."""
+    if not user_has_permission(user, "tracking_device", "view"):
+        return None
+    from apps.tracking.services import fleet_current_telemetry
+
+    rows = fleet_current_telemetry(user)
+    counts = dict.fromkeys(LIVE_STATUS_KEYS, 0)
+    for vehicle in rows:
+        counts[live_status_key(vehicle)] += 1
+    tracked = len(rows)
+    return {
+        "tracked": tracked,
+        **counts,
+        "online": sum(1 for v in rows if v.get("connection_status") == "ONLINE"),
+        "immobilized": sum(1 for v in rows if v.get("immobilizer") is True),
+        "alerting": sum(1 for v in rows if v.get("active_alert")),
+        "share": {key: round(counts[key] * 100 / tracked) if tracked else 0 for key in LIVE_STATUS_KEYS},
+    }
+
+
+def todays_trip_activity(user):
+    """Today's ignition-based trips + distance — the Trip Report's own computation — plus the
+    performance figures that follow from it: utilisation (vehicles with a trip / GPS-equipped
+    vehicles) and the average moving speed of today's readings."""
+    if not user_has_permission(user, "tracking_device", "view"):
+        return None
+    from django.conf import settings
+    from django.db.models import Avg
+
+    from apps.core.utils import display_timezone
+    from apps.tracking.models import TelemetryEvent
+    from apps.tracking.trip_report import compute_vehicle_trips, scoped_tracked_vehicles
+
+    tz = display_timezone()
+    now = timezone.now()
+    today = now.astimezone(tz).date()
+    trips, summary = compute_vehicle_trips(user=user, start_date=today, end_date=today, now=now)
+    equipped = scoped_tracked_vehicles(user)
+    with_trips = len({t.vehicle.id for t in trips})
+    day_start = datetime.datetime.combine(today, datetime.time.min, tzinfo=tz)
+    avg_speed = (
+        TelemetryEvent.objects.filter(
+            vehicle_id__in=[v.id for v in equipped], timestamp__gte=day_start,
+            speed__gt=settings.TELEMATICS_MOVEMENT_SPEED_THRESHOLD_KMH,
+        ).aggregate(v=Avg("speed"))["v"]
+        if equipped else None
+    )
+    return {
+        "total_trips": summary["total_trips"],
+        "active_trips": summary["active_trips"],
+        "distance_km": summary["total_distance_km"],
+        "avg_duration_seconds": summary["avg_duration_seconds"],
+        "avg_duration_text": _duration_text(summary["avg_duration_seconds"]),
+        "vehicles_with_trips": with_trips,
+        "equipped_vehicles": len(equipped),
+        "utilization_pct": round(with_trips * 100 / len(equipped)) if equipped else None,
+        "avg_moving_speed_kmh": round(float(avg_speed)) if avg_speed is not None else None,
+        "recent_trips": [
+            {
+                "vehicle": t.vehicle.registration_number,
+                "vehicle_uuid": str(t.vehicle.uuid),
+                "status": t.status,
+                "start_at": t.start_at,
+                "end_at": t.end_at,
+                "distance_km": t.distance_km,
+                "start_location": t.start_location,
+            }
+            for t in trips[:RECENT_TRIPS_LIMIT]  # newest first
+        ],
+    }
+
+
+def _duration_text(seconds):
+    if not seconds:
+        return "—"
+    minutes = int(seconds) // 60
+    return f"{minutes // 60}h {minutes % 60:02d}m" if minutes >= 60 else f"{minutes}m"
+
+
+def alerts_overview(user, days=7):
+    """Open alerts by level, conditions still active, a per-day trend by level and the latest
+    alerts — scoped exactly like the Alert Report (apps.alerts.report.scoped_alerts)."""
+    if not user_has_permission(user, "alert", "view"):
+        return None
+    from apps.alerts.models import Alert
+    from apps.alerts.report import scoped_alerts
+    from apps.core.utils import display_timezone
+
+    tz = display_timezone()
+    alerts = scoped_alerts(user)
+    open_by_level = dict(
+        alerts.filter(status=Alert.Status.OPEN, is_archived=False).order_by().values_list("severity").annotate(n=Count("id"))
+    )
+    active_now = alerts.filter(
+        category__in=Alert.LIVE_ATTENTION_CATEGORIES, signal_cleared_at__isnull=True, is_archived=False
+    ).exclude(status=Alert.Status.RESOLVED).count()
+
+    today = timezone.now().astimezone(tz).date()
+    first_day = today - datetime.timedelta(days=days - 1)
+    start = datetime.datetime.combine(first_day, datetime.time.min, tzinfo=tz)
+    per_day = {}
+    for occurred_at, severity in alerts.filter(occurred_at__gte=start).values_list("occurred_at", "severity"):
+        key = (occurred_at.astimezone(tz).date(), severity)
+        per_day[key] = per_day.get(key, 0) + 1
+    day_list = [first_day + datetime.timedelta(days=i) for i in range(days)]
+    trend = {
+        "labels": [d.strftime("%d %b") for d in day_list],
+        "series": {level: [per_day.get((d, level), 0) for d in day_list] for level in ALERT_LEVELS},
+    }
+    labels = dict(Alert.Category.choices)
+    recent = [
+        {
+            "uuid": str(a.uuid),
+            "type": labels.get(a.category, a.category),
+            "category": a.category,
+            "level": a.severity,
+            "level_label": a.get_severity_display(),
+            "vehicle": a.vehicle.registration_number if a.vehicle_id else "",
+            "occurred_at": a.triggered_at or a.occurred_at,
+            "active": a.signal_cleared_at is None,
+            "status": a.get_status_display(),
+        }
+        for a in alerts.select_related("vehicle").order_by("-occurred_at")[:RECENT_ALERTS_LIMIT]
+    ]
+    return {
+        "open_total": sum(open_by_level.values()),
+        "open_by_level": [(level, open_by_level.get(level, 0)) for level in ALERT_LEVELS],
+        "active_now": active_now,
+        "week_total": sum(per_day.values()),
+        "trend": trend,
+        "recent": recent,
+    }
+
+
+def fleet_activity_24h(user):
+    """Per hour, over the last 24 h, from the stored GPS history: how many vehicles reported and how
+    many were moving (speed above the movement threshold), plus vehicle alerts raised that hour.
+    Two aggregate queries; None without tracking_device.view."""
+    if not user_has_permission(user, "tracking_device", "view"):
+        return None
+    from django.conf import settings
+    from django.db.models.functions import TruncHour
+
+    from apps.core.utils import display_timezone
+    from apps.tracking.models import TelemetryEvent
+
+    tz = display_timezone()
+    now_local = timezone.now().astimezone(tz)
+    first_hour = now_local.replace(minute=0, second=0, microsecond=0) - datetime.timedelta(hours=23)
+    hours = [first_hour + datetime.timedelta(hours=i) for i in range(24)]
+    vehicle_ids = scope_queryset(Vehicle.objects.all(), user).values("id")
+    rows = (
+        TelemetryEvent.objects.filter(vehicle_id__in=vehicle_ids, timestamp__gte=first_hour)
+        .annotate(h=TruncHour("timestamp", tzinfo=tz)).values("h")
+        .annotate(
+            reporting=Count("vehicle", distinct=True),
+            moving=Count("vehicle", distinct=True, filter=Q(speed__gt=settings.TELEMATICS_MOVEMENT_SPEED_THRESHOLD_KMH)),
+        )
+    )
+    by_hour = {r["h"].astimezone(tz).replace(minute=0, second=0, microsecond=0): r for r in rows}
+    alerts_by_hour = {}
+    if user_has_permission(user, "alert", "view"):
+        from apps.alerts.report import scoped_alerts
+
+        for r in (scoped_alerts(user).filter(occurred_at__gte=first_hour)
+                  .annotate(h=TruncHour("occurred_at", tzinfo=tz)).values("h").annotate(n=Count("id"))):
+            alerts_by_hour[r["h"].astimezone(tz).replace(minute=0, second=0, microsecond=0)] = r["n"]
+    reporting = [by_hour.get(h, {}).get("reporting", 0) for h in hours]
+    return {
+        "labels": [h.strftime("%H:00") for h in hours],
+        "reporting": reporting,
+        "moving": [by_hour.get(h, {}).get("moving", 0) for h in hours],
+        "alerts": [alerts_by_hour.get(h, 0) for h in hours] if user_has_permission(user, "alert", "view") else None,
+        "has_data": any(reporting) or any(alerts_by_hour.values()),
+    }
+
+
+def recent_activity_feed(alerts_info, trip_activity):
+    """Latest alerts + today's trips, newest first, for the dashboard timeline (no extra queries)."""
+    items = []
+    for a in (alerts_info or {}).get("recent", []):
+        if a["occurred_at"] is None:
+            continue
+        items.append({
+            "kind": "alert", "at": a["occurred_at"], "title": a["type"], "vehicle": a["vehicle"],
+            "level": a["level"], "level_label": a["level_label"], "active": a["active"], "status": a["status"],
+            "url_alert": a["uuid"],
+        })
+    for t in (trip_activity or {}).get("recent_trips", []):
+        ended = t["status"] != "ACTIVE" and t["end_at"]
+        items.append({
+            "kind": "trip", "at": t["end_at"] if ended else t["start_at"],
+            "title": "Trip completed" if ended else "Trip started", "vehicle": t["vehicle"],
+            "distance_km": t["distance_km"], "active": t["status"] == "ACTIVE", "place": t["start_location"],
+        })
+    items.sort(key=lambda i: i["at"], reverse=True)
+    return items[:ACTIVITY_FEED_LIMIT]
+
+
+GPS_TRIPS_TABLE_LIMIT = 8
+
+
+def gps_trips_week(user, days=7):
+    """GPS-detected trips (the Trip Report's own detection) for the dashboard's trip widgets: trips and
+    distance per day over the last ``days`` days, the trips in progress now and the latest trips.
+    The Trips module (planned/dispatched trips) is separate; these are what the vehicles actually drove."""
+    if not user_has_permission(user, "tracking_device", "view"):
+        return None
+    from apps.core.utils import display_timezone
+    from apps.tracking.trip_report import compute_vehicle_trips, resolve_trip_drivers
+
+    tz = display_timezone()
+    now = timezone.now()
+    today = now.astimezone(tz).date()
+    first_day = today - datetime.timedelta(days=days - 1)
+    trips, summary = compute_vehicle_trips(user=user, start_date=first_day, end_date=today, now=now)
+    day_list = [first_day + datetime.timedelta(days=i) for i in range(days)]
+    per_day = {d: [0, 0.0] for d in day_list}
+    for t in trips:
+        day = t.start_at.astimezone(tz).date()
+        if day in per_day:
+            per_day[day][0] += 1
+            per_day[day][1] += float(t.distance_km or 0)
+    drivers = resolve_trip_drivers(trips, tz=tz)
+
+    def row(t):
+        driver = drivers.get(id(t))
+        return {
+            "vehicle": t.vehicle.registration_number,
+            "driver": driver.get_full_name() if driver else "",
+            "status": t.status,
+            "start_at": t.start_at,
+            "end_at": t.end_at,
+            "start_location": t.start_location,
+            "end_location": t.end_location,
+            "distance_km": t.distance_km,
+            "duration_text": _duration_text(t.duration(now=now).total_seconds()),
+        }
+
+    return {
+        "total": summary["total_trips"],
+        "distance_km": summary["total_distance_km"],
+        "trend": {
+            "labels": [d.strftime("%d %b") for d in day_list],
+            "trips": [per_day[d][0] for d in day_list],
+            "distance_km": [round(per_day[d][1], 1) for d in day_list],
+        },
+        "active": [row(t) for t in trips if t.status == "ACTIVE"],
+        "recent": [row(t) for t in trips[:GPS_TRIPS_TABLE_LIMIT]],  # newest first
+    }

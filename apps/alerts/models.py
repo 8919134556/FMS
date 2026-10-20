@@ -140,6 +140,13 @@ class Alert(UUIDModel, TimeStampedModel):
         Category.DEVICE_BATTERY_DISCONNECTED, Category.DEVICE_BATTERY_LOW_VOLTAGE,
         Category.GEOFENCE_ENTRY, Category.GEOFENCE_EXIT, Category.GEOFENCE_SPEEDING,
     )
+    # Conditions that turn the vehicle's Live Tracking pin red while they last (signal_cleared_at null,
+    # not resolved / archived). Not IDLE (the pin already shows idle as amber) and not GEOFENCE_ENTRY /
+    # GEOFENCE_EXIT (presence events: they stay open for as long as the vehicle is inside / outside).
+    LIVE_ATTENTION_CATEGORIES = (
+        Category.PANIC, Category.OVER_SPEEDING, Category.GEOFENCE_SPEEDING, Category.MAIN_POWER_DISCONNECTED,
+        Category.LOW_VOLTAGE, Category.DEVICE_BATTERY_DISCONNECTED, Category.DEVICE_BATTERY_LOW_VOLTAGE,
+    )
 
     class Meta:
         ordering = ["-created_at"]

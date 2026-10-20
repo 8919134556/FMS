@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.tracking.models import DeviceCommand, RawTelemetryEvent, TrackingDevice
+from apps.tracking.models import DeviceCommand, ImmobilizerCommand, RawTelemetryEvent, TrackingDevice
 
 # TelemetryEvent/VehicleCurrentTelemetry are deliberately NOT registered here
 # — high-volume/single-row-per-vehicle tables respectively, better inspected
@@ -38,6 +38,26 @@ class DeviceCommandAdmin(admin.ModelAdmin):
     list_filter = ("status", "command_type")
     search_fields = ("device__imei",)
     readonly_fields = [f.name for f in DeviceCommand._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ImmobilizerCommand)
+class ImmobilizerCommandAdmin(admin.ModelAdmin):
+    """Read-only audit trail of immobilizer commands sent via the comms command API
+    (apps.tracking.immobilizer). Sent only from the Live Map popup."""
+
+    list_display = ("vehicle", "requested_state", "unit_no", "command_id", "status", "timed_out", "requested_by", "created_at")
+    list_filter = ("requested_state", "status", "timed_out")
+    search_fields = ("unit_no", "vehicle__registration_number", "command_id")
+    readonly_fields = [f.name for f in ImmobilizerCommand._meta.fields]
 
     def has_add_permission(self, request):
         return False

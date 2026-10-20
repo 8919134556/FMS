@@ -331,3 +331,21 @@ class TestLiveTrackingGeofenceLayer:
         assert 'id="liveGeofenceLegend"' in html
         for kind in ("ENTRY", "EXIT", "SPEED_LIMIT"):
             assert f'data-geofence-count="{kind}"' in html
+
+    def test_legend_can_be_minimized_without_touching_the_geofences(self, client):
+        """The minimize button collapses the legend panel only: it is separate from the ON/OFF toggle
+        (which hides the shapes) and never reaches the geofence layer, the feed or any alert."""
+        from pathlib import Path
+
+        from django.conf import settings
+
+        client.force_login(UserFactory(role=_role_with((Permission.Module.TRACKING_DEVICE, Permission.Action.VIEW))))
+        html = client.get(reverse("tracking:live_map")).content.decode()
+        assert 'id="liveGeofenceLegendBtn"' in html and 'aria-controls="liveGeofenceLegendItems"' in html
+        assert 'title="Minimize Geofence Options"' in html
+        for kind in ("ENTRY", "EXIT", "SPEED_LIMIT", "ENTRY_AND_EXIT"):  # rows kept, inside the collapsible part
+            assert f'data-geofence-count="{kind}"' in html
+        js = (Path(settings.BASE_DIR) / "static" / "js" / "live_tracking.js").read_text(encoding="utf-8")
+        body = js[js.index("function setGeofenceLegendCollapsed"):js.index("function initGeofences")]
+        assert "Maximize Geofence Options" in body and "sessionStorage" in body
+        assert "geofenceLayer" not in body and "geofencesVisible" not in body and "fetch(" not in body

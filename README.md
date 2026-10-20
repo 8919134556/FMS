@@ -189,8 +189,14 @@ marker) flies the map to its exact position at street-level zoom.
   lock prevents duplicates under concurrent ingestion. A failure there is logged and never loses telemetry.
 * **Notification.** A new event notifies (bell, `Notification.alert`) every active user with `alert.view` who
   can see that vehicle's client. The bell polls every 15 s (60 s in a background tab); `static/js/alert_center.js`
-  shows the popup and plays a short alarm once per notification (remembered per browser; the alarm waits
-  for the first click if the browser blocks audio). Only events newer than `ALERT_NOTIFY_MAX_AGE_MINUTES`
+  shows a compact toast and plays a short alarm once per notification (remembered per browser; the alarm
+  waits for the first click if the browser blocks audio). Toasts sit top-right (under the topbar, under the
+  Live Tracking map controls — any `[data-fms-toast-anchor]` — or under an open dialog's header), newest on
+  top, at most 3 at once (the oldest leaves; everything stays in the bell and the Alert Report), and fade out
+  after 7 s, paused while hovered (`FmsAlertCenter.configure({toastDurationMs, maxVisible})`). Each shows
+  the alert type, Level (accent: High/Critical red, Medium amber, Low info), vehicle, time and one detail line
+  built from the alert's data (`apps.notifications.services.alert_toast_detail`: "Speed: 64 km/h",
+  "Entered: <geofence>"...). Closing a toast only hides it — the alert and notification are unchanged. Only events newer than `ALERT_NOTIFY_MAX_AGE_MINUTES`
   (default 1440) notify, so a history import does not page anyone.
 * **Reports > Alert Report** (`/alerts/report/`, API `/api/v1/alerts/`): date range, vehicle, alert type and
   status filters, server-side paging/sorting, details with map, acknowledge/resolve (`alert.update`),
@@ -237,7 +243,8 @@ marker) flies the map to its exact position at street-level zoom.
   link their geofence (Alert Report filter, PDF/Excel "Geofence" and "Speed limit" columns).
   Live Tracking draws every active geofence the viewer may see (client users: only those assigned to their
   vehicles), coloured by type (Entry green, Exit orange, Speed Limit red, Entry and Exit purple), with hover / click
-  details, a legend, and a Geofences ON/OFF button that only hides them visually.
+  details, a legend, and a Geofences ON/OFF button that only hides them visually. The legend has its own
+  minimize (−/+) button that only collapses the panel (remembered for the browser tab).
 * **Fast notifications (no WebSockets in this deployment):** the bell asks `/notifications/pulse/` every 2 s (10 s
   in a background tab) — one indexed lookup of the newest unread alert notification — and loads the full feed,
   popup and sound only when it changes. With the comms bridge at `COMMS_SYNC_INTERVAL_SECONDS=2` (a pass takes
@@ -245,6 +252,74 @@ marker) flies the map to its exact position at street-level zoom.
 * **Backfill** history imported before this existed: `python manage.py backfill_panic_alerts --days 7`
   (idempotent, sends no notifications). New types (overspeed, geofence, ...) = a new `Alert.Category` plus a
   detector in `apps/alerts/events.py`; the report, bell and exports need no change.
+
+### Live Tracking vehicle markers
+
+`static/js/vehicle_icons.js` (`FmsVehicleIcons`) is the one marker system used by the map, the selected marker,
+the Live Map popup, the vehicle panel and the Vehicle Status table:
+
+* **Pin** — ONE map pin + ONE vehicle graphic. The graphic (white face, front-view vector illustration per
+  type) says WHAT the vehicle is and never changes colour; the pin colour says HOW it is. Registration pill
+  below; no status dot. The type comes from the comms `current_table.vechile_type` (read into
+  `VehicleCurrentTelemetry.vehicle_type`, stored as comms has it), else the FMS Vehicle Type; matching is
+  case-insensitive with synonyms ("mini-bus", "motorcycle", "SUV", "LCV", "auto rickshaw"...). Anything else
+  or nothing -> Other.
+* **Pin colour = status**, priority **active alert (red) > moving (green) > idle (amber) > ignition off
+  (grey)**; offline is grey and faded. Moving/idle/ignition come from the feed's `movement_state`, `ignition`
+  and `connection_status` (`FmsVehicleIcons.statusFor`, also used by the tooltip, panel and popup). "Active
+  alert" is the feed's `active_alert` (`apps.tracking.services.active_alerts_by_vehicle`): the most severe
+  alert of `Alert.LIVE_ATTENTION_CATEGORIES` (Panic, Over Speeding, Geofence Speeding, Main Power
+  Disconnected, Low Voltage, Device Battery Disconnected / Low Voltage) whose condition is still going on
+  (`signal_cleared_at` empty) and that isn't resolved or archived. Idle alerts are already the amber pin, and
+  Geofence Entry / Exit are presence events that stay open while the vehicle is inside / outside, so neither
+  turns the pin red. When the condition clears the pin goes back to its movement colour by itself. Colours
+  change with a short fade; an alert pin has a slow, soft halo. A new alert announced by the bell
+  (`fms:alert`) refreshes the feed at once; everything else follows the page's refresh interval.
+* **Direction** — the fleet feed's `direction` (`apps/tracking/direction.py`): `{degrees, cardinal (N/NE/E/SE/S/SW/W/NW),
+  label, source, moving}`. The comms App DB stores `direction = 0` for every reading, so a constant 0 is treated
+  as "no heading": the device heading is used only when the device really reports one, otherwise the bearing of
+  the vehicle's GPS track (from its last position at least 25 m away, within 30 min — jitter while parked never
+  counts). Checked against the device's own angle (comms Raw DB `teltonika_raw_table.angle`) on 300 moving
+  readings: median error 5 deg, 96 % within one compass sector. On the map only the direction arrow on the pin's rim
+  turns to it (the short way round) while the vehicle is moving; the vehicle picture and the pin never rotate; the
+  label adds the compass point (`· 42 km/h · NE`). The tooltip and the Live Map popup / vehicle panel show a
+  compass with "North-East · 45°" (or "Stationary · last heading …"). Offline vehicles are never shown as moving.
+* **Movement** — markers glide to each new fix (~1 s, requestAnimationFrame); long hops (> 2 km), hidden tabs
+  and far zoom jump instead.
+* **Detail by zoom** — compact far out (< 12); registration label on hover / selection (12-15); every label,
+  with speed when moving, from street level (>= 16). Hover tooltip: registration, type, status, speed.
+* **Performance** — each marker is built once and then patched in place: position, rotation, status classes,
+  illustration (only if the type changes), label and tooltip are updated only when they change.
+
+### Vehicle immobilizer (Live Map popup)
+
+The Live Map popup has a **Vehicle Immobilizer** panel. Two statuses are kept apart everywhere:
+
+* **Actual state** — `VehicleCurrentTelemetry.immobilizer`, synced by the comms bridge from the comms
+  `current_table` column `immobalizer` (spelled that way there): `1` = ON, `0` = OFF, empty = unknown. It comes
+  only from the device data and is never changed by sending a command. It is in the fleet feed (`immobilizer`),
+  so the popup, the marker and the table always agree. While it is ON the vehicle's pin is **black** — the
+  pin priority is immobilizer ON (black) > active alert (red) > moving (green) > idle (amber) > ignition off
+  (grey); an alert on an immobilized vehicle keeps its red halo and tooltip line.
+* **Command status** — `ImmobilizerCommand` (`apps/tracking/immobilizer.py`). FMS calls the comms command
+  API server-side (the browser never sees its address or key): `POST {COMMS_COMMAND_API_URL}/commands/immobilizer`
+  with `{"unit_no": <the vehicle's own GPS device IMEI>, "state": "on"|"off"}`, keeps the returned
+  `command_id`, and the popup polls FMS every 2 s, which asks `GET /commands/{command_id}`: `0` Pending,
+  `1` Processing, `2` Sent to device, `3` Failed, `4` Completed (3 and 4 are final). A reply for another
+  command or unit is ignored. After `IMMOBILIZER_COMMAND_TIMEOUT_SECONDS` (120) the command is shown as timed
+  out. After Completed, the popup keeps refreshing the feed for up to 60 s until the device reports the new
+  state.
+
+API: `GET|POST /api/v1/tracking/vehicles/<uuid>/immobilizer/` and
+`GET /api/v1/tracking/immobilizer-commands/<uuid>/`. Sending needs **GPS Device -> Send Command**
+(`tracking_device.command`); client users are read-only and only see the state. One command in progress per
+vehicle; every command is audit-logged (entity `ImmobilizerCommand`). These are deliberately not
+`DeviceCommand` rows: FMS's own telematics dispatcher sends every PENDING `DeviceCommand`, so a comms-API
+command stored there could reach the vehicle twice.
+
+Settings (`.env`): `COMMS_COMMAND_API_URL` (default `http://127.0.0.1:9009`), `COMMS_COMMAND_API_KEY`
+(sent as `X-API-Key` when set), `COMMS_COMMAND_API_TIMEOUT_SECONDS`, `IMMOBILIZER_COMMAND_TIMEOUT_SECONDS`,
+`IMMOBILIZER_POLL_INTERVAL_SECONDS`.
 
 ### Live Tracking auto-refresh
 
@@ -300,6 +375,24 @@ assignment, DRAFT→...→COMPLETED workflow), which is untouched; Trip Report a
   (`metadata.gps_status: 0`). `trip_route()` drops them from the path; `_finalize()`/`_apply_live_position()`
   leave a trip's start/end position (and Start/End Location text) blank rather than `(0, 0)` when the
   boundary reading itself has no fix — see `apps/tracking/trip_report._has_gps_fix()`.
+
+### Dashboard — Live Fleet, today's trips, alerts
+
+The dashboard (admin and role workspaces) opens with a **Live Fleet** section, every number real and
+permission-gated (`apps/core/dashboard_services.py`):
+
+* **Status tiles** — Tracked, Moving, Idle (ignition on), Ignition Off, Offline, Immobilized, from the Live
+  Tracking fleet feed with the map markers' own rule (`live_status_key` == `vehicle_icons.js statusFor`). Each
+  links to Live Tracking (with `?status=` where the map has that filter). `static/js/dashboard_live.js`
+  re-reads the same feed every 30 s (one request at a time, paused in background tabs) and updates the tiles
+  and the **Live Status Mix** donut in place. Needs `tracking_device.view`.
+* **Today's Trips** — trips, in progress, distance and average duration from the Trip Report's own detection
+  (`compute_vehicle_trips`). Needs `tracking_device.view`.
+* **Open Alerts** (by level, "active now" = conditions still going on), **Alerts — Last 7 Days** (stacked by
+  level) and **Latest Alerts** (each opens that alert in the Alert Report) — scoped exactly like the Alert
+  Report (`apps.alerts.report.scoped_alerts`). Needs `alert.view`.
+
+Each block is isolated (`DashboardView._safe`): a failing query shows "Unable to load…" for that block only.
 
 ### Responsive UI
 

@@ -164,7 +164,8 @@ class TestDelayedAndUnassignedTrips:
         TripFactory(status=Trip.Status.DELAYED)
         client.force_login(viewer)
         response = client.get(reverse("core:dashboard"))
-        assert b"Delayed Trip" in response.content
+        # The Needs Attention panel was removed from the page; the items are still computed.
+        assert any("Delayed Trip" in item["title"] for item in response.context["attention_items"])
 
     def test_unassigned_scheduled_trip_appears_in_attention(self, client):
         role = role_with((Permission.Module.TRIP, Permission.Action.VIEW))
@@ -172,7 +173,7 @@ class TestDelayedAndUnassignedTrips:
         TripFactory(status=Trip.Status.SCHEDULED)
         client.force_login(viewer)
         response = client.get(reverse("core:dashboard"))
-        assert b"Unassigned Trip" in response.content
+        assert any("Unassigned Trip" in item["title"] for item in response.context["attention_items"])
 
     def test_delayed_trip_kpi_links_to_dispatch_board(self, client):
         role = role_with((Permission.Module.TRIP, Permission.Action.VIEW))
@@ -201,7 +202,7 @@ class TestMaintenanceAlerts:
         MaintenanceFactory(scheduled_date=timezone.now().date() - datetime.timedelta(days=3))
         client.force_login(viewer)
         response = client.get(reverse("core:dashboard"))
-        assert b"Overdue Maintenance" in response.content
+        assert any("Overdue Maintenance" in item["title"] for item in response.context["attention_items"])
         assert response.context["maintenance_overview"]["overdue"] == 1
 
     def test_empty_state_no_maintenance_issues(self, client):

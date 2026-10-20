@@ -16,6 +16,8 @@
        data-devices-url="{% url 'tracking:device_list' %}"
        data-vehicles-url="{% url 'vehicles:vehicle_list' %}"
        data-geofences-url="{% url 'geofences:geofence_map_data' %}"
+       data-immobilizer-url-template="{% url 'vehicle-immobilizer' vehicle_uuid='00000000-0000-0000-0000-000000000000' %}"
+       data-immobilizer-command-url-template="{% url 'immobilizer-command-status' command_uuid='00000000-0000-0000-0000-000000000000' %}"
        data-no-telemetry-url="{% url 'vehicles:vehicle_list' %}?gps=none"
        data-no-telemetry-count="{{ no_telemetry_count }}"
        data-timezone="{{ display_timezone }}"
@@ -94,7 +96,7 @@
         <div class="map-loading-spinner"></div>
       </div>
 
-      <div class="map-controls-top-right">
+      <div class="map-controls-top-right" data-fms-toast-anchor>
         <button type="button" class="btn btn-sm btn-light live-geofence-toggle is-on" id="liveGeofenceToggle"
                 aria-pressed="true" title="Hide geofences">
           <i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Geofences</span>
@@ -109,11 +111,21 @@
       </div>
 
       <div class="live-geofence-legend d-none" id="liveGeofenceLegend" aria-label="Geofence legend">
-        <div class="live-geofence-legend-title">Geofences</div>
+        <div class="live-geofence-legend-head">
+          <span class="live-geofence-legend-title">Geofences</span>
+          {# Collapses this panel only — the geofences, their alerts and the ON/OFF toggle are untouched. #}
+          <button type="button" class="live-geofence-legend-btn" id="liveGeofenceLegendBtn"
+                  aria-expanded="true" aria-controls="liveGeofenceLegendItems"
+                  title="Minimize Geofence Options" aria-label="Minimize Geofence Options">
+            <i class="bi bi-dash-lg" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="live-geofence-legend-items" id="liveGeofenceLegendItems">
         <div><span class="swatch" style="--swatch: var(--fms-success);"></span>Entry <span class="count" data-geofence-count="ENTRY">0</span></div>
         <div><span class="swatch" style="--swatch: var(--fms-warning);"></span>Exit <span class="count" data-geofence-count="EXIT">0</span></div>
         <div><span class="swatch" style="--swatch: var(--fms-danger);"></span>Speed Limit <span class="count" data-geofence-count="SPEED_LIMIT">0</span></div>
         <div><span class="swatch" style="--swatch: var(--fms-purple);"></span>Entry and Exit <span class="count" data-geofence-count="ENTRY_AND_EXIT">0</span></div>
+        </div>
       </div>
 
       <div class="map-refresh-error d-none" id="fleetRefreshError">
@@ -192,7 +204,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <div class="live-vehicle-heading">
-            <span class="live-header-icon"><i class="bi bi-geo-alt"></i></span>
+            <span class="live-header-icon" id="liveVehicleModalIcon"><i class="bi bi-geo-alt"></i></span>
             <div class="min-w-0">
               <h3 class="section-title mb-0" id="liveVehicleModalTitle" style="font-size:1.05rem;">Live Map</h3>
               <span class="text-small text-muted-fms" id="liveVehicleModalSubtitle"></span>
@@ -222,5 +234,6 @@
   <script src="{% static 'js/auto_refresh.js' %}"></script>
   <script src="{% static 'js/fms_format.js' %}"></script>
   <script src="{% static 'js/fms_map.js' %}"></script>
+  <script src="{% static 'js/vehicle_icons.js' %}"></script>
   <script src="{% static 'js/live_tracking.js' %}"></script>
 {% endblock %}

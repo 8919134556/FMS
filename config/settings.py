@@ -213,6 +213,8 @@ REST_FRAMEWORK = {
         "fleet_read": "4000/hour",  # Live Tracking polls every 5-300 s; see FleetReadRateThrottle
         "trip_report_export": "120/hour",  # PDF/Excel downloads; see TripReportExportRateThrottle
         "device_ingest": "120/min",
+        "immobilizer_status": "3000/hour",  # the Live Map popup polls a running command every 2 s
+        "immobilizer_command": "60/hour",  # sending ON/OFF commands
     },
 }
 
@@ -306,6 +308,16 @@ COMMS_RAW_DATABASE_URL = env("COMMS_RAW_DATABASE_URL", default="")
 # (runserver / WSGI / ASGI) — no separate `manage.py sync_comms_data --loop` needed. Off by default.
 COMMS_SYNC_AUTOSTART = env.bool("COMMS_SYNC_AUTOSTART", default=False)
 COMMS_SYNC_INTERVAL_SECONDS = env.int("COMMS_SYNC_INTERVAL_SECONDS", default=10)
+# Zentora comms command API (apps.tracking.immobilizer): FMS calls it server-side only — the
+# browser never sees this URL or key. POST {base}/commands/immobilizer, GET {base}/commands/{id}.
+# Empty URL = the Live Tracking immobilizer control is shown read-only.
+COMMS_COMMAND_API_URL = env("COMMS_COMMAND_API_URL", default="http://127.0.0.1:9009")
+COMMS_COMMAND_API_KEY = env("COMMS_COMMAND_API_KEY", default="")  # sent as X-API-Key when set
+COMMS_COMMAND_API_TIMEOUT_SECONDS = env.float("COMMS_COMMAND_API_TIMEOUT_SECONDS", default=8)
+# How long the Live Map popup waits for an immobilizer command to reach Failed/Completed, and how
+# often it asks. After the timeout a new command may be sent (the old one is shown as timed out).
+IMMOBILIZER_COMMAND_TIMEOUT_SECONDS = env.int("IMMOBILIZER_COMMAND_TIMEOUT_SECONDS", default=120)
+IMMOBILIZER_POLL_INTERVAL_SECONDS = env.int("IMMOBILIZER_POLL_INTERVAL_SECONDS", default=2)
 
 # Alert events (apps.alerts.events): only events newer than this notify users
 # (bell + popup + sound) — a first import of old history must not page everyone.

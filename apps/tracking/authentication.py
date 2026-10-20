@@ -71,6 +71,18 @@ class IsActiveDevice(BasePermission):
         return bool(device) and getattr(device, "status", None) == TrackingDevice.Status.ACTIVE
 
 
+class ImmobilizerStatusRateThrottle(UserRateThrottle):
+    """The Live Map popup asks for a running immobilizer command's status every ~2 s."""
+
+    scope = "immobilizer_status"
+
+
+class ImmobilizerCommandRateThrottle(UserRateThrottle):
+    """Sending immobilizer ON/OFF commands."""
+
+    scope = "immobilizer_command"
+
+
 class FleetReadRateThrottle(UserRateThrottle):
     """The Live Tracking page polls the fleet feed as often as every 5 s
     (720 requests/hour for one open tab). That would exhaust the general

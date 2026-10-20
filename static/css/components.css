@@ -448,46 +448,63 @@ a.notification-row-title:hover { color: var(--fms-primary); }
 /* Sidebar                                                                */
 /* ---------------------------------------------------------------------- */
 
+/* Navy pane, full-width green active item, white labels — tokens --fms-nav-* (design-tokens.css).
+   Markup: templates/components/sidebar.html (unchanged). */
+/* Logo band. The logo's own colours (dark-blue lettering) need a light plate, so the band is white
+   in both themes — the logo is never recoloured. Expanded: full logo; collapsed (desktop): symbol only.
+   Both images stay in the DOM and cross-fade, so collapsing never re-lays-out the band. */
 .sidebar-brand {
+  position: relative;
   height: var(--fms-topbar-height);
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 var(--fms-space-4);
-  border-bottom: 1px solid var(--fms-border);
-  flex-shrink: 0;
-}
-.sidebar-brand .mark {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--fms-radius-sm);
-  background: linear-gradient(135deg, var(--fms-primary), #2563eb);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.7rem;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
-}
-.sidebar-brand .brand-text {
+  justify-content: center; /* logo centred both ways in the band, in both states */
+  padding: 0 var(--fms-space-3);
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 1px 0 rgba(2, 6, 23, 0.25);
   overflow: hidden;
-  white-space: nowrap;
+  flex-shrink: 0;
 }
-.sidebar-brand .brand-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--fms-text-primary);
-  line-height: 1.15;
+.brand-logo-full {
+  display: block;
+  flex: none; /* always its natural size (never squeezed); the band clips it while the sidebar animates */
+  height: 48px; /* 169 x 48 at the logo's own 3.51 : 1 ratio */
+  width: auto;
+  transform-origin: center;
+  /* expanding: fade in once the sidebar has (mostly) finished widening */
+  transition: opacity 0.2s var(--fms-ease) 0.16s, transform 0.25s var(--fms-ease) 0.16s, visibility 0s;
 }
-.sidebar-brand .brand-subtitle {
-  font-size: 10px;
-  color: var(--fms-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.brand-logo-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.85);
+  transition: opacity 0.15s var(--fms-ease), transform 0.2s var(--fms-ease), visibility 0s linear 0.2s;
 }
-.fms-shell.is-collapsed .sidebar-brand .brand-text,
+/* Follows the real collapsed state on every screen size (the drawer is icons-only too when collapsed). */
+.fms-shell.is-collapsed .brand-logo-full {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.92);
+  transition: opacity 0.12s var(--fms-ease), transform 0.2s var(--fms-ease), visibility 0s linear 0.12s;
+}
+.fms-shell.is-collapsed .brand-logo-mark {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.2s var(--fms-ease) 0.1s, transform 0.25s var(--fms-ease) 0.1s, visibility 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo-full, .brand-logo-mark { transition: none; }
+}
 .fms-shell.is-collapsed .nav-group-heading span,
 .fms-shell.is-collapsed .nav-link-label,
 .fms-shell.is-collapsed .nav-phase-badge,
@@ -495,15 +512,22 @@ a.notification-row-title:hover { color: var(--fms-primary); }
   display: none;
 }
 
+/* Items run edge to edge (the active bar spans the full pane, as in the reference). */
 .sidebar-scroll {
   flex-grow: 1;
   overflow-y: auto;
-  padding: var(--fms-space-3) var(--fms-space-3) var(--fms-space-6);
+  padding: var(--fms-space-2) 0 var(--fms-space-6);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
+.sidebar-scroll::-webkit-scrollbar { width: 6px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 3px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
 
 .nav-group {
   margin-bottom: 2px;
 }
+.nav-group + .nav-group { border-top: 1px solid var(--fms-nav-divider); padding-top: 2px; }
 
 .nav-group-heading {
   display: flex;
@@ -512,17 +536,20 @@ a.notification-row-title:hover { color: var(--fms-primary); }
   width: 100%;
   background: none;
   border: none;
-  padding: 10px 10px 6px;
-  color: var(--fms-text-muted);
-  font-size: var(--fms-text-tiny);
+  padding: 10px 18px 5px;
+  color: var(--fms-nav-muted);
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   font-weight: 700;
   cursor: pointer;
+  transition: color var(--fms-duration-fast) var(--fms-ease);
 }
-.nav-group-heading:hover { color: var(--fms-text-secondary); }
+.nav-group-heading:hover { color: var(--fms-nav-text-strong); }
+.nav-group-heading:focus-visible { outline: 2px solid var(--fms-nav-accent); outline-offset: -2px; }
 .nav-group-chevron {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
+  opacity: 0.8;
   transition: transform var(--fms-duration-base) var(--fms-ease);
 }
 .nav-group.is-collapsed .nav-group-chevron {
@@ -542,53 +569,55 @@ a.notification-row-title:hover { color: var(--fms-primary); }
 .nav-link-fms {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 8px 10px;
+  gap: 12px;
+  padding: 8px 18px;
   margin: 1px 0;
-  border-radius: var(--fms-radius-md);
-  color: var(--fms-text-secondary);
-  font-size: var(--fms-text-body);
-  font-weight: 500;
+  border-radius: 0;
+  color: var(--fms-nav-text);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   position: relative;
   transition: background var(--fms-duration-fast) var(--fms-ease), color var(--fms-duration-fast) var(--fms-ease);
 }
 .nav-link-fms .bi {
-  font-size: 1rem;
+  font-size: 0.95rem;
   width: 18px;
   text-align: center;
   flex-shrink: 0;
-  color: var(--fms-text-muted);
+  color: rgba(255, 255, 255, 0.82);
   transition: color var(--fms-duration-fast) var(--fms-ease);
 }
 .nav-link-fms:hover {
-  background: var(--fms-surface-2);
-  color: var(--fms-text-primary);
+  background: var(--fms-nav-hover);
+  color: var(--fms-nav-text-strong);
 }
-.nav-link-fms:hover .bi { color: var(--fms-text-primary); }
+.nav-link-fms:hover .bi { color: var(--fms-nav-text-strong); }
+.nav-link-fms:focus-visible { outline: 2px solid var(--fms-nav-accent); outline-offset: -2px; }
 
 .nav-link-fms.active {
-  background: rgba(var(--fms-primary-rgb), 0.14);
-  color: var(--fms-text-primary);
+  background: linear-gradient(90deg, var(--fms-nav-active) 0%, var(--fms-nav-active-2) 100%);
+  color: var(--fms-nav-text-strong);
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 8px -2px rgba(20, 83, 45, 0.55);
 }
-.nav-link-fms.active .bi { color: var(--fms-primary); }
+.nav-link-fms.active .bi { color: var(--fms-nav-text-strong); }
 .nav-link-fms.active::before {
   content: "";
   position: absolute;
-  left: -12px;
-  top: 6px;
-  bottom: 6px;
+  left: 0;
+  top: 0;
+  bottom: 0;
   width: 3px;
-  border-radius: var(--fms-radius-full);
-  background: var(--fms-primary);
+  background: var(--fms-nav-accent);
 }
 
 .nav-link-fms.is-locked {
-  color: var(--fms-text-muted);
+  color: rgba(203, 213, 225, 0.42);
   cursor: default;
 }
-.nav-link-fms.is-locked .bi { color: var(--fms-text-muted); opacity: 0.6; }
-.nav-link-fms.is-locked:hover { background: transparent; color: var(--fms-text-muted); }
+.nav-link-fms.is-locked .bi { color: rgba(203, 213, 225, 0.42); opacity: 1; }
+.nav-link-fms.is-locked:hover { background: transparent; color: rgba(203, 213, 225, 0.42); }
 
 .nav-link-label { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -597,14 +626,19 @@ a.notification-row-title:hover { color: var(--fms-primary); }
   font-weight: 700;
   padding: 1px 6px;
   border-radius: var(--fms-radius-full);
-  background: var(--fms-surface-2);
-  color: var(--fms-text-muted);
-  border: 1px solid var(--fms-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fms-nav-muted);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
 
+/* Collapsed (icons only): centred icons, same full-width active bar */
+.fms-shell.is-collapsed .nav-link-fms { justify-content: center; padding: 10px 0; }
+.fms-shell.is-collapsed .nav-group-heading { justify-content: center; padding: 8px 0 4px; }
+
 .sidebar-footer {
-  border-top: 1px solid var(--fms-border);
+  border-top: 1px solid var(--fms-nav-divider);
+  background: rgba(2, 6, 23, 0.18);
   padding: var(--fms-space-2) var(--fms-space-3);
   flex-shrink: 0;
 }
@@ -617,10 +651,13 @@ a.notification-row-title:hover { color: var(--fms-primary); }
   border-radius: var(--fms-radius-md);
   background: transparent;
   border: none;
-  color: var(--fms-text-muted);
+  color: var(--fms-nav-muted);
   font-size: var(--fms-text-small);
+  transition: background var(--fms-duration-fast) var(--fms-ease), color var(--fms-duration-fast) var(--fms-ease);
 }
-.sidebar-collapse-btn:hover { background: var(--fms-surface-2); color: var(--fms-text-primary); }
+.sidebar-collapse-btn:hover { background: var(--fms-nav-hover); color: var(--fms-nav-text-strong); }
+.sidebar-collapse-btn:focus-visible { outline: 2px solid var(--fms-nav-accent); outline-offset: -2px; }
+.fms-shell.is-collapsed .sidebar-collapse-btn { justify-content: center; }
 .fms-shell.is-collapsed .sidebar-collapse-btn .bi-layout-sidebar-inset { transform: scaleX(-1); }
 
 /* ---------------------------------------------------------------------- */
@@ -1225,67 +1262,80 @@ a.notification-row-title:hover { color: var(--fms-primary); }
 /* ---------------- Vehicle alert popup (static/js/alert_center.js) ---------------- */
 .notification-item.is-alert .notification-item-title { color: var(--fms-danger); }
 
+/* Compact, non-blocking toasts in the top-right; newest on top. The stack itself
+   lets clicks through — only the toasts take the pointer. `top` is moved below a
+   visible [data-fms-toast-anchor] (Live Tracking map controls) by alert_center.js. */
 .fms-alert-stack {
   position: fixed;
   top: calc(var(--fms-topbar-height, 64px) + 12px);
-  left: 50%;
-  transform: translateX(-50%);
+  right: 16px;
   z-index: calc(var(--fms-z-toast, 1090) + 5);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: min(420px, calc(100vw - 32px));
+  gap: 8px;
+  width: min(320px, calc(100vw - 32px));
   pointer-events: none;
+  transition: top .2s var(--fms-ease, ease);
 }
-.fms-alert-popup {
+.fms-alert-toast {
+  --toast-accent: var(--fms-info, #0ea5e9);
   pointer-events: auto;
-  background: var(--fms-danger);
-  color: #fff;
-  border-radius: var(--fms-radius-lg, 12px);
-  box-shadow: 0 18px 40px rgba(var(--fms-danger-rgb, 220, 38, 38), 0.35), var(--fms-shadow-lg);
-  overflow: hidden;
-  animation: fms-alert-in 0.25s var(--fms-ease, ease-out), fms-alert-pulse 1.2s ease-in-out 0.25s 3;
-}
-.fms-alert-popup.is-medium {
-  background: var(--fms-warning);
-  color: #1f1300;
-  box-shadow: 0 18px 40px rgba(var(--fms-warning-rgb, 217, 119, 6), 0.35), var(--fms-shadow-lg);
-  animation: fms-alert-in 0.25s var(--fms-ease, ease-out);
-}
-.fms-alert-popup.is-medium .fms-alert-popup-row { border-top-color: rgba(0, 0, 0, 0.12); }
-.fms-alert-popup.is-medium .btn-close { filter: none; }
-.fms-alert-popup.is-medium .btn-outline-light { color: #1f1300; border-color: rgba(0, 0, 0, 0.35); }
-.fms-alert-popup-message { margin: 0 0 6px; font-size: var(--fms-text-small, 0.85rem); font-weight: 600; }
-.fms-alert-popup-head {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 12px 14px 8px;
+  padding: 9px 30px 9px 12px;
+  background: var(--fms-surface, #fff);
+  color: var(--fms-text-primary, #0f172a);
+  border: 1px solid var(--fms-border);
+  border-left: 3px solid var(--toast-accent);
+  border-radius: var(--fms-radius-md, 8px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .14), 0 1px 3px rgba(15, 23, 42, .08);
+  font-size: .8rem;
+  line-height: 1.3;
+  animation: fms-toast-in .22s var(--fms-ease, ease-out);
 }
-.fms-alert-popup-icon { font-size: 1.35rem; line-height: 1; }
-.fms-alert-popup-title { flex: 1; font-weight: 800; font-size: 1.02rem; letter-spacing: 0.01em; }
-.fms-alert-popup-body { padding: 0 14px 6px; }
-.fms-alert-popup-row {
-  display: flex;
-  gap: 10px;
-  padding: 3px 0;
-  font-size: var(--fms-text-small, 0.85rem);
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
+.fms-alert-toast.is-high { --toast-accent: var(--fms-danger); }
+.fms-alert-toast.is-medium { --toast-accent: var(--fms-warning); }
+.fms-alert-toast.is-leaving { animation: fms-toast-out .2s ease-in forwards; pointer-events: none; }
+.fms-alert-toast-icon {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--toast-accent); background: color-mix(in srgb, var(--toast-accent) 13%, transparent); font-size: .85rem; margin-top: 1px;
 }
-.fms-alert-popup-row span { width: 72px; flex: none; opacity: 0.85; }
-.fms-alert-popup-row strong { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
-.fms-alert-popup-sound {
-  margin: 4px 14px 0;
-  padding: 6px 8px;
-  border-radius: var(--fms-radius-sm, 6px);
-  background: rgba(0, 0, 0, 0.18);
-  font-size: var(--fms-text-tiny, 0.75rem);
+.fms-alert-toast-body { flex: 1; min-width: 0; }
+.fms-alert-toast-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.fms-alert-toast-title {
+  font-weight: 700; font-size: .84rem; color: inherit; text-decoration: none;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.fms-alert-popup-actions { display: flex; gap: 8px; padding: 10px 14px 12px; }
-.fms-alert-popup-actions .btn { flex: 1; }
-@keyframes fms-alert-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
-@keyframes fms-alert-pulse { 50% { box-shadow: 0 0 0 6px rgba(var(--fms-danger-rgb, 220, 38, 38), 0.35), var(--fms-shadow-lg); } }
-@media (prefers-reduced-motion: reduce) { .fms-alert-popup { animation: none; } }
+.fms-alert-toast-title:hover, .fms-alert-toast-title:focus-visible { color: var(--toast-accent); text-decoration: underline; }
+.fms-alert-toast-level {
+  flex: none; font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--toast-accent);
+}
+.fms-alert-toast-vehicle { font-weight: 600; margin-top: 1px; display: flex; gap: 6px; align-items: baseline; }
+.fms-alert-toast-time { font-weight: 500; font-size: .72rem; color: var(--fms-text-muted); }
+.fms-alert-toast-detail {
+  color: var(--fms-text-secondary, #475569); margin-top: 1px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.fms-alert-toast-sound { margin-top: 4px; font-size: .7rem; color: var(--fms-text-muted); display: flex; gap: 4px; align-items: center; }
+.fms-alert-toast-sound.d-none { display: none; }
+.fms-alert-toast-close {
+  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--fms-text-muted); font-size: .7rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.fms-alert-toast-close:hover, .fms-alert-toast-close:focus-visible { background: var(--fms-neutral-soft, rgba(100, 116, 139, .1)); color: var(--fms-text-primary); }
+@keyframes fms-toast-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes fms-toast-out { to { opacity: 0; transform: translateX(12px); } }
+@media (max-width: 575.98px) {
+  .fms-alert-stack { right: 12px; width: min(290px, calc(100vw - 24px)); gap: 6px; }
+  .fms-alert-toast { padding: 7px 28px 7px 10px; font-size: .76rem; }
+  .fms-alert-toast-icon { width: 22px; height: 22px; font-size: .75rem; }
+  .fms-alert-toast-time { display: none; }
+  .fms-alert-toast-detail { -webkit-line-clamp: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .fms-alert-toast, .fms-alert-toast.is-leaving { animation: none; } .fms-alert-stack { transition: none; } }
 
 /* ---------------- Geofence form: map editor + vehicle checklist ---------------- */
 .geofence-editor { display: grid; gap: 12px; }

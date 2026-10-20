@@ -14,42 +14,35 @@
       {% include "dashboard/partials/_activity.html" %}
     </div>
   {% else %}
+    {% include "dashboard/partials/_live_fleet.html" %}
+    {% if live_fleet or alerts_info %}<h2 class="ov-section-title">Operations</h2>{% endif %}
     {% include "dashboard/partials/_kpi_strip.html" %}
+    {% include "dashboard/partials/_connectivity.html" %}
 
-    {% if can_view_trip or can_view_vehicle %}
-      <div class="dashboard-row cols-2">
-        {% if can_view_trip %}
-          <div class="card-fms chart-card dash-panel">
-            <div class="dash-panel-header">
-              <div>
-                <span class="section-title" style="font-size:.95rem;">Trips — Last 7 Days</span>
-                <p class="text-small text-muted-fms mb-0">Scheduled vs. completed, per day</p>
-              </div>
+    {% include "dashboard/partials/_fleet_insights.html" %}
+    {% include "dashboard/partials/_trips_fleet_status.html" %}
+    {% include "dashboard/partials/_recent_activity.html" %}
+
+    {% if not gps_week and not gps_week_error and can_view_trip %}
+      <div class="dashboard-row">
+        <div class="card-fms chart-card dash-panel">
+          <div class="dash-panel-header">
+            <div>
+              <span class="section-title" style="font-size:.95rem;">Trips — Last 7 Days</span>
+              <p class="text-small text-muted-fms mb-0">Scheduled vs. completed, per day</p>
             </div>
-            <div class="chart-box"><canvas id="tripTrendChart"></canvas></div>
           </div>
-        {% endif %}
-        {% if can_view_vehicle %}
-          <div class="card-fms chart-card dash-panel">
-            <div class="dash-panel-header"><span class="section-title" style="font-size:.95rem;">Fleet Status</span></div>
-            {% if total_vehicles %}
-              <div class="chart-box"><canvas id="fleetLifecycleChart"></canvas></div>
-            {% else %}
-              {% include "components/empty_state.html" with icon="truck-front" title="No vehicles yet" message="Vehicles will appear here once they're added." %}
-            {% endif %}
-          </div>
-        {% endif %}
+          <div class="chart-box"><canvas id="tripTrendChart"></canvas></div>
+        </div>
       </div>
     {% endif %}
 
-    <div class="dashboard-row cols-2-wide">
-      {% include "dashboard/partials/_attention.html" %}
+    <div class="dashboard-row">
       {% include "dashboard/partials/_notifications.html" %}
     </div>
 
     {% include "dashboard/partials/_quick_actions.html" %}
 
-    {% include "dashboard/partials/_connectivity.html" %}
     {% include "dashboard/partials/_todays_ops.html" %}
     {% include "dashboard/partials/_active_trips.html" %}
     {% include "dashboard/partials/_availability.html" %}

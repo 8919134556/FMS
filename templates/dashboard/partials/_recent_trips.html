@@ -1,5 +1,37 @@
 {% load fms_extras %}
-    {% if can_view_trip %}
+    {% if gps_week %}
+      {# The latest GPS-detected trips (Trip Report), newest first. #}
+      <div class="table-card">
+        <div class="table-card-header">
+          <span class="section-title">Recent Trips</span>
+          <a href="{% url 'tracking:trip_report' %}" class="btn btn-sm btn-outline-secondary">View All</a>
+        </div>
+        {% if gps_week.recent %}
+          <div class="table-responsive-fms">
+            <table class="table">
+              <thead><tr><th>Vehicle</th><th>Driver</th><th>Start</th><th>End</th><th class="text-end">Duration</th><th class="text-end">Distance</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for trip in gps_week.recent %}
+                  <tr>
+                    <td><strong>{{ trip.vehicle }}</strong></td>
+                    <td class="cell-secondary">{{ trip.driver|default:"Unassigned" }}</td>
+                    <td class="cell-secondary">{{ trip.start_at|date:"d M, H:i" }}</td>
+                    <td class="cell-secondary">{% if trip.end_at %}{{ trip.end_at|date:"H:i" }}{% else %}—{% endif %}</td>
+                    <td class="cell-secondary text-end">{{ trip.duration_text }}</td>
+                    <td class="cell-secondary text-end">{% if trip.distance_km is not None %}{{ trip.distance_km|floatformat:1 }} km{% else %}—{% endif %}</td>
+                    <td>{% if trip.status == "ACTIVE" %}{% include "components/status_badge.html" with status="IN_PROGRESS" label="In progress" %}{% else %}{% include "components/status_badge.html" with status="COMPLETED" label="Completed" %}{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          {% include "components/empty_state.html" with icon="signpost-split" title="No trips in the last 7 days" message="Trips appear here once vehicles drive with the ignition on." %}
+        {% endif %}
+      </div>
+    {% elif gps_week_error %}
+      <div class="table-card"><div class="widget-error"><i class="bi bi-exclamation-triangle"></i>Unable to load recent trips.</div></div>
+    {% elif can_view_trip %}
       <div class="table-card">
         <div class="table-card-header">
           <span class="section-title">Recent Trips</span>

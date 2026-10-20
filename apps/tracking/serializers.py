@@ -29,6 +29,21 @@ class ActiveTripSerializer(serializers.Serializer):
     trip_number = serializers.CharField()
 
 
+class ActiveAlertSerializer(serializers.Serializer):
+    category = serializers.CharField()
+    label = serializers.CharField()
+    severity = serializers.CharField()
+    since = serializers.DateTimeField(allow_null=True)
+
+
+class DirectionSerializer(serializers.Serializer):
+    degrees = serializers.IntegerField(allow_null=True)
+    cardinal = serializers.CharField(allow_null=True)  # N, NE, E, SE, S, SW, W, NW
+    label = serializers.CharField(allow_null=True)  # North, North-East, ...
+    source = serializers.CharField(allow_null=True)  # "device" (its heading) or "gps" (from the GPS track)
+    moving = serializers.BooleanField()
+
+
 class FleetCurrentTelemetrySerializer(serializers.Serializer):
     """Feeds the Live Fleet Map (Phase 3.4) — a plain Serializer, not a
     ModelSerializer, since each item is a pre-merged dict from
@@ -55,6 +70,9 @@ class FleetCurrentTelemetrySerializer(serializers.Serializer):
     connection_status = serializers.CharField()
     movement_state = serializers.CharField(allow_null=True)
     active_trip = ActiveTripSerializer(allow_null=True)
+    active_alert = ActiveAlertSerializer(allow_null=True, required=False)  # red pin while set
+    immobilizer = serializers.BooleanField(allow_null=True, required=False)  # actual state: True = ON
+    direction = DirectionSerializer(allow_null=True, required=False)
 
 
 class TripReportSerializer(serializers.Serializer):

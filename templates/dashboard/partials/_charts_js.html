@@ -4,17 +4,21 @@
 
     const DATA = {
       tripTrend: {{ trip_trend_json|safe }},
+      gpsTripTrend: {{ gps_trip_trend_json|safe }},
       tripStatus: {{ trip_status_json|safe }},
       fleet: {{ fleet_status_json|safe }},
       activity: {{ activity_trend_json|safe }},
       usersByRole: {{ users_by_role_json|safe }},
       usersByStatus: {{ users_by_status_json|safe }},
+      liveStatus: {{ live_status_json|safe }},
+      fleetActivity: {{ fleet_activity_json|safe }},
+      alertTrend: {{ alert_trend_json|safe }},
     };
 
     const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     function tokens() {
       return {
-        grid: token("--fms-border"), text: token("--fms-text-muted"), surface: token("--fms-surface"),
+        grid: token("--fms-border"), text: token("--fms-text-muted"), surface: token("--fms-surface") || token("--fms-card"),
         primary: token("--fms-primary"), primaryRgb: token("--fms-primary-rgb"),
         info: token("--fms-info"), success: token("--fms-success"), warning: token("--fms-warning"),
         danger: token("--fms-danger"), purple: token("--fms-purple"),
@@ -51,6 +55,27 @@
           scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid } } },
         },
       }),
+      gpsTripTrendChart: (t) => ({
+        type: "bar",
+        data: {
+          labels: DATA.gpsTripTrend.labels,
+          datasets: [
+            { type: "bar", label: "Trips", data: DATA.gpsTripTrend.trips, backgroundColor: `rgba(${t.primaryRgb}, 0.7)`, borderRadius: 4, maxBarThickness: 34, yAxisID: "y", order: 2 },
+            { type: "line", label: "Distance (km)", data: DATA.gpsTripTrend.distance_km, borderColor: t.success, backgroundColor: t.success,
+              cubicInterpolationMode: "monotone", pointRadius: 3, borderWidth: 2, yAxisID: "y1", order: 1 },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: { legend },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid }, title: { display: true, text: "Trips" } },
+            y1: { position: "right", beginAtZero: true, grid: { display: false }, title: { display: true, text: "km" } },
+          },
+        },
+      }),
       tripStatusChart: (t) => ({
         type: "doughnut",
         data: {
@@ -68,9 +93,29 @@
         return {
           type: "doughnut",
           data: {
-            labels: DATA.fleet.labels,
+            // legend shows each status with its count ("Active · 1"); clicks still use the plain labels
+            labels: DATA.fleet.labels.map((l, i) => `${l} · ${DATA.fleet.data[i]}`),
             datasets: [{ data: DATA.fleet.data, backgroundColor: DATA.fleet.labels.map((l) => colors[l] || t.text), borderColor: t.surface, borderWidth: 2 }],
           },
+          plugins: [{
+            id: "fleetTotal", // total vehicles in the ring's centre
+            afterDraw(chart) {
+              const { ctx, chartArea: a } = chart;
+              const total = DATA.fleet.data.reduce((sum, n) => sum + n, 0);
+              const x = (a.left + a.right) / 2;
+              const y = (a.top + a.bottom) / 2;
+              ctx.save();
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillStyle = token("--fms-text-primary");
+              ctx.font = "700 24px Inter, sans-serif";
+              ctx.fillText(String(total), x, y - 6);
+              ctx.fillStyle = t.text;
+              ctx.font = "600 10px Inter, sans-serif";
+              ctx.fillText(total === 1 ? "VEHICLE" : "VEHICLES", x, y + 14);
+              ctx.restore();
+            },
+          }],
           options: {
             maintainAspectRatio: false, cutout: "66%", plugins: { legend },
             onClick: (evt, els) => {
@@ -81,7 +126,7 @@
             },
           },
         };
-      }),
+      },
       activityTrendChart: (t) => ({
         type: "line",
         data: {
@@ -106,6 +151,77 @@
           scales: { x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid } }, y: { grid: { display: false } } },
         },
       }),
+      // Live fleet: same colours as the map pins (moving green, idle amber, ignition off / offline grey).
+      liveStatusChart: (t) => ({
+        type: "doughnut",
+        data: {
+          labels: DATA.liveStatus.labels,
+          datasets: [{
+            data: DATA.liveStatus.data,
+            backgroundColor: [t.success, t.warning, "#94a3b8", "#e2e8f0"],
+            borderColor: t.surface, borderWidth: 3, hoverOffset: 4,
+          }],
+        },
+        options: {
+          maintainAspectRatio: false, cutout: "74%",
+          plugins: { legend: { display: false } }, // the overview renders its own legend with counts
+          onClick: (evt, els) => {
+            if (!els.length) return;
+            const filter = { moving: "moving", idle: "idle", offline: "offline" }[DATA.liveStatus.keys[els[0].index]];
+            window.location.href = filter ? `/tracking/live/?status=${filter}` : "/tracking/live/";
+          },
+        },
+      }),
+      // Fleet activity, last 24 h: vehicles reporting (area) and moving (bars) per hour, alerts on their own axis.
+      fleetActivityChart: (t) => {
+        const A = DATA.fleetActivity;
+        const datasets = [
+          { type: "bar", label: "Moving", data: A.moving, backgroundColor: "rgba(22, 163, 74, 0.75)", borderRadius: 3, maxBarThickness: 14, order: 2 },
+          { type: "line", label: "Reporting", data: A.reporting, borderColor: t.primary, backgroundColor: `rgba(${t.primaryRgb}, 0.10)`,
+            fill: true, cubicInterpolationMode: "monotone", pointRadius: 0, pointHoverRadius: 4, borderWidth: 2, order: 1 },
+        ];
+        if (A.alerts) {
+          datasets.push({ type: "line", label: "Alerts", data: A.alerts, yAxisID: "y1", borderColor: t.danger, backgroundColor: t.danger,
+            borderDash: [4, 3], cubicInterpolationMode: "monotone", pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.5, order: 0 });
+        }
+        return {
+          type: "bar", // mixed chart: each dataset sets its own type
+          data: { labels: A.labels, datasets },
+          options: {
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: { legend: { position: "top", align: "end", labels: { boxWidth: 10, usePointStyle: true, padding: 14, sort: (a, b) => a.datasetIndex - b.datasetIndex } } },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0 } },
+              y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid }, title: { display: true, text: "Vehicles" } },
+              ...(A.alerts ? { y1: { position: "right", beginAtZero: true, ticks: { precision: 0 }, grid: { display: false }, title: { display: true, text: "Alerts" } } } : {}),
+            },
+          },
+        };
+      },
+      alertTrendChart: (t) => {
+        const colors = { CRITICAL: "#7f1d1d", HIGH: t.danger, MEDIUM: t.warning, LOW: t.info };
+        const names = { CRITICAL: "Critical", HIGH: "High", MEDIUM: "Medium", LOW: "Low" };
+        return {
+          type: "bar",
+          data: {
+            labels: DATA.alertTrend.labels,
+            datasets: Object.keys(DATA.alertTrend.series || {}).map((level) => ({
+              label: names[level] || level, data: DATA.alertTrend.series[level],
+              backgroundColor: colors[level] || t.text, borderRadius: 4, borderSkipped: false, maxBarThickness: 34,
+            })),
+          },
+          options: {
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: { legend },
+            scales: {
+              x: { stacked: true, grid: { display: false } },
+              y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid } },
+            },
+          },
+        };
+      },
       usersByStatusChart: (t) => {
         const colors = { Active: t.success, Inactive: t.text, Suspended: t.warning, Locked: t.danger, Invited: t.info };
         return {
@@ -125,6 +241,14 @@
       Object.keys(builders).forEach((id) => draw(id, builders[id]));
     }
     buildAll();
+    // For static/js/dashboard_live.js: update a chart's data in place after a live refresh.
+    window.FmsDashboardCharts = {
+      setLiveStatus(data) {
+        DATA.liveStatus.data = data;
+        const chart = charts.liveStatusChart;
+        if (chart) { chart.data.datasets[0].data = data; chart.update(); }
+      },
+    };
 
     // Chart.js bakes theme colors in at draw time, so re-tint on theme switch.
     new MutationObserver((mutations) => {
